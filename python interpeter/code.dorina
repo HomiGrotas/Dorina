@@ -1,0 +1,15 @@
+x = 0
+y = 0
+z = "Hello"
+
+while(x < 5)
+{
+    x += 1
+    y -= 2
+    shout(z)
+}
+
+if(x > y)
+{
+    x = 0
+}
