@@ -1,4 +1,4 @@
-# Dorina
+# Dorina programming language
 Programming language with assembly interpeter
 This is the final project of my assembly learning.
 
