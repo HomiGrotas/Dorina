@@ -16,7 +16,7 @@ memoryVariables db memorySize dup('@')     ; buffer array - stores the data from
 
 ; variables for file opening
 filename db 'testfile.txt',0	  ; file to operate on
-filehandle dw ?					  ; file handle
+filehandle dw '$'					  ; file handle
 ErrorMsg db 'Error', 10, 13,'$'   ; error message
 
 ; variables for reading the file
@@ -24,9 +24,24 @@ buffer db lineLength dup('#')
 char db '&'
 
 CODESEG
+
+; constants
 param1 equ [bp + 4]
 param2 equ [bp + 6]
 param3 equ [bp + 8]
+
+;------------------------------------------------------------------------------------------------------
+;  Macros
+;------------------------------------------------------------------------------------------------------
+macro newLine
+	; new line
+	MOV dl, 10		; ascii ---> 10 New Line
+	MOV ah, 02h
+	INT 21h
+	MOV dl, 13		; ascii ---> 13 Carriage Return
+	MOV ah, 02h
+	INT 21h
+endm
 
 
 ;------------------------------------------------------------------------------------------------------
@@ -53,8 +68,8 @@ endp OpenFile
 
 
 proc readLineByLine
-	lea si, [buffer]
 	
+	xor si, si				; buffer length
     read_line:
             mov ah, 3Fh      		;read file
             mov bx, [filehandle]
@@ -71,16 +86,17 @@ proc readLineByLine
             cmp al, 0Ah    			; line feed
             je LF
 
-            mov [si], al			; location in the buffer
+            mov [offset buffer + si], al			; location in the buffer
             inc si					; inc the location in the buffer
-
             jmp read_line
 			
 	EOF: ; end of file
 		jmp finish
 	
 	LF:	; line feed - handle the line and return reading
+		push si 
 		call handleOneLineCommand
+		xor si, si				; reset buffer length
 		jmp read_line
 		
 	finish:	
@@ -110,8 +126,11 @@ proc printArray
 	mov bx, param1	; array length
 	mov cx, param2  ; array offset
 	xor si, si
-	mov ah, 2  ; write mode	
+	mov ah, 2  		; write mode	
 	
+	newLine
+		
+	; print array
 	printLoop:
 		mov dl, [bx + si]
 		int 21h
@@ -127,13 +146,18 @@ endp printArray
 ; Handlers procedures - understand command 
 ;------------------------------------------------------------------------------------------------------
 proc handleOneLineCommand
-	nop
-	nop
-	nop
-	nop
-	nop
-
-	ret
+	push bp
+	mov bp, sp
+	
+	mov ax, param1    			; buffer length
+	lea bx, [buffer]			; buffer offset
+	
+	push ax
+	push bx
+	call printArray
+	
+	pop bp
+	ret 2
 endp handleOneLineCommand
 
 
