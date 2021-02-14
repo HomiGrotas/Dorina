@@ -2,11 +2,14 @@ IDEAL
 MODEL small
 STACK 100h
 
-; ToDO: math operators
+; ToDO:
+;	    handle big var names - Done
+;		math operators
 ;		interpret location assignments
 ;		insert value procedure
 ;		get value procedure
 
+; HowTo: get var name: insert var length, insert to stack 2 by 2  mem:[length, name, value, length, name, value...]
 
 DATASEG
 
@@ -30,11 +33,14 @@ memoryInd dw 0 ; can be up to 65,535
 ; variables for file opening
 filename db 'testfile.txt',0	  ; file to operate on
 filehandle dw '$'					  ; file handle
-ErrorMsg db 'Error', 10, 13,'$'   ; error message
 
 ; variables for reading the file
 buffer db lineLength dup('#')
 char db '&'
+
+; messages
+ErrorMsg db 'Error!','$'   ; error message
+FinishMsg db 'Finished!', '$' ; finished the program
 
 
 CODESEG
@@ -43,6 +49,8 @@ CODESEG
 ;------------------------------------------------------------------------------------------------------
 ;  Macros
 ;------------------------------------------------------------------------------------------------------
+
+; goes a line down
 macro newLine
 	; new line
 	mov dl, 10		; ascii ---> 10 New Line
@@ -52,6 +60,16 @@ macro newLine
 	mov ah, 02h
 	int 21h
 endm
+
+;-------------------------------------------
+; Macro: printMsg
+;   macro to print a string as parameter
+;-------------------------------------------
+macro printMsg msg_to_print
+    mov dx, offset &msg_to_print
+	mov ah, 9h
+	int 21h
+endm	
 
 
 ;------------------------------------------------------------------------------------------------------
@@ -136,10 +154,10 @@ proc printArray
 	mov bx, param1	; array length
 	mov cx, param2  ; array offset
 	xor si, si
-	mov ah, 2  		; write mode	
 	
 	newLine
-		
+	mov ah, 2  		; write mode	
+	
 	; print array
 	printLoop:
 		mov dl, [bx + si]
@@ -245,45 +263,7 @@ proc handleOneLineCommand
 endp handleOneLineCommand
 
 
-
-;-----------------------------------------------------------
-; handle var and memory procedure
-; params: var value, var name
-;-----------------------------------------------------------
-proc handleVarAndMem
-	push bp
-	mov bp, sp
-	
-	; save registers
-	push ax
-	push bx
-	push dx
-	push si
-	
-	; get aruments
-	mov ax, param1  ; var name
-	mov dx, param2  ; var value
-	
-	; save in mem
-	lea bx, [memoryVariables]
-	mov si, [memoryInd]
-	mov [bx + si], ax	; save var name
-	add si, 2
-	mov [bx + si], dx	; save var value
-	
-	add [memoryInd], 2
-	
-	pop si
-	pop dx
-	pop bx
-	pop ax
-	
-	pop bp
-	ret 4
-endp handleVarAndMem
-
-
-
+; ToDo: change format
 proc checkExistsVar
 	push bp
 	mov bp, sp
@@ -320,20 +300,109 @@ proc checkExistsVar
 		ret 2
 endp checkExistsVar
 
+
+
+;-----------------------------------------------------------
+; handle var and memory procedure - inserts new var to memory
+; params: var name length, var name, var value
+; mem:[length, name, value, length, name, value...]
+;-----------------------------------------------------------
+proc handleVarAndMem
+	push bp
+	mov bp, sp
+	
+	; save registers
+	push ax
+	push bx
+	push cx
+	push dx
+	push di
+	
+	
+	; get name length
+	mov cx, param1
+	lea bx, [memoryVariables]
+	mov di, [memoryInd]
+	
+	
+	; add var name length to mem
+	mov [bx + di], cx
+	add di, 2
+
+	; update memory index
+	add [memoryInd], cx
+	add [memoryInd], 4 ; 2 more for name length and 2 more for value
+
+	shr cx, 1 ; stack is divided per words, therefore, should divide iterations by 2
+	
+	mov si, 4 ; location in stack from where the name starts
+	add si, param1
+
+	; gets name part from the stack and inserts it to the memory
+	getNamePartInsertMem:		
+		; get word from stack and insert to memory
+		mov ax, [bp + si]
+		mov [bx + di], ax
+		
+		; update index
+		add di, 2	
+		sub si, 2
+		loop getNamePartInsertMem
+	
+	
+	; insert value to memory - after the var name
+	mov si, 6
+	add si, param1
+	mov ax, [bp + si]
+	mov [bx + di], ax
+		
+		
+	; return sp to its original value
+	sub di, [memoryInd]
+	add di, 2  ; original address location on stack
+	add sp, di
+	
+	pop di
+	pop dx
+	pop cx
+	pop bx
+	pop ax
+	pop bp
+	ret 
+endp handleVarAndMem
+
+
+
+
 ;----------------
 ; START
 ;----------------
 start:
 	mov ax, @data
 	mov ds, ax
+
+	;call OpenFile
+	;call readLineByLine
+	;call closeFile
 	
-	call OpenFile
-	call readLineByLine
-	call closeFile
+	push 50  ; value
+	push 'he'
+	push 'll'
+	push '0!'
+	push 6    ; length
+	call handleVarAndMem
 	
+	
+	; print memory
 	push memorySize
-	push [memoryVariables]
+	push offset memoryVariables
 	call printArray
+		
+	newLine
+	newLine
+	newLine
+	newLine
+	printMsg FinishMsg
 
 
 exit: 
