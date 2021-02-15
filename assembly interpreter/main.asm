@@ -9,7 +9,7 @@ STACK 100h
 ;		insert value procedure
 ;		get value procedure
 
-; HowTo: get var name: insert var length, insert to stack 2 by 2  mem:[length, name, value, length, name, value...]
+; HowTo: get var name: insert var length, insert to stack 2 by 2  mem:[length, name, type, value, length, name, type, value...]
 
 DATASEG
 
@@ -25,6 +25,11 @@ param3 equ [bp + 8]
 localVar1 equ [bp - 2]
 localVar2 equ [bp - 4]
 localVar3 equ [bp - 6]
+
+; variables types
+integer equ 0
+string equ 1
+boolean equ 2
 
 
 memoryVariables dw memorySize dup('*')     ; buffer array - stores the data from the file
@@ -170,6 +175,11 @@ proc printArray
 endp printArray
 
 
+;-------------------------------
+; compare string procedure
+; params: 2 chars, 2 chars (word size each param)
+; returns with dh
+;-------------------------------
 proc cmpStrings
 	push bp
 	mov bp, sp
@@ -302,11 +312,11 @@ endp checkExistsVar
 
 
 
-;-----------------------------------------------------------
+;---------------------------------------------------------------
 ; handle var and memory procedure - inserts new var to memory
 ; params: var name length, var name, var value
-; mem:[length, name, value, length, name, value...]
-;-----------------------------------------------------------
+; mem:[length, name, type, value, length, name, type, value...]
+;---------------------------------------------------------------
 proc handleVarAndMem
 	push bp
 	mov bp, sp
@@ -331,7 +341,7 @@ proc handleVarAndMem
 
 	; update memory index
 	add [memoryInd], cx
-	add [memoryInd], 4 ; 2 more for name length and 2 more for value
+	add [memoryInd], 6 ; 2 for name, type, value
 
 	shr cx, 1 ; stack is divided per words, therefore, should divide iterations by 2
 	
@@ -350,9 +360,18 @@ proc handleVarAndMem
 		loop getNamePartInsertMem
 	
 	
-	; insert value to memory - after the var name
+	; insert var type
 	mov si, 6
 	add si, param1
+	mov ax, [bp + si]
+	mov [bx + di], ax
+	
+	; move to next paran and next location in memory
+	add di, 2
+	add si, 2
+
+	
+	; insert value to memory - after the var name
 	mov ax, [bp + si]
 	mov [bx + di], ax
 		
@@ -386,12 +405,12 @@ start:
 	;call closeFile
 	
 	push 50  ; value
-	push 'he'
-	push 'll'
-	push '0!'
+	push string
+	push 'ab'
+	push 'cd'
+	push 'ef'
 	push 6    ; length
 	call handleVarAndMem
-	
 	
 	; print memory
 	push memorySize
