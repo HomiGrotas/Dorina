@@ -272,40 +272,78 @@ proc handleOneLineCommand
 		ret 2
 endp handleOneLineCommand
 
-
-; ToDo: change format
+;-------------------------------------------
+; checkExistsVar procedure
+; checks whether a variable exists in the memory
+; params: var name length, var name
+;-------------------------------------------
 proc checkExistsVar
 	push bp
 	mov bp, sp
 	
+	sub sp, 2  ; for localVar1
+	
 	xor dh, dh	   ; default - var doesn't exists
-	mov ax, param1 ; var name
-	xor si, si
+	mov ax, param1 ; var name length
+	mov localVar1, ax
 	
-	cmp si, [memoryInd]
-	je finishCheckExistsVar
-	
+	mov si, 6	   ; source index in stack (2 for return address, 2 for param1)
+	xor di, di	   ; index in memory
 	lea bx, [memoryVariables]
-	sub si, 2
+	xor ax, ax
 	
-	; looping through the memoryVariables
-	keepChecking:
-		add si, 2
-		push [bx + si]
-		push ax
-		call cmpStrings
+	
+	loopingMem:
+		mov cx, [bx + di]  ; length of var name
+
+		; if var name length in stack != var name length in memory -> jump to procedure end
+		cmp localVar1, cx
+		jne continueLooping
 		
-		cmp dh, true
-		je found
 		
-		cmp si, [memoryInd]
-		jne keepChecking
+		; if they have same length
+		shr cx, 1  ; word size need half iterations
+		loopingNames:
+			; ToDO: check useful way
+			push [bp + si]
+			sub si, 4	; have constant difference of 4 between stack and memory
+			
+			add si, ax
+			push [bx + si]
+			call cmpStrings	; compare 2 chars from stack and 2 from memory
+			sub si, ax
+			
+			; if don't match -> continue to next var in mem
+			cmp dh, 0
+			je continueLooping
+			
+			; match -> keep compare the rest of the variables names
+			add si, 6
+			loop loopingNames
+		jmp found
+		
+		
+		continueLooping:
+			; go to next var in mem
+			add di, [bx]
+			add di, 6
+			mov si, 6	   ; source index in stack (2 for return address, 2 for param1)
+			
+			add ax, [bx + di]
+			add ax, 6
+			
+			cmp di, [memoryInd]      
+			jbe loopingMem
+	
+		
+	jmp finishCheckExistsVar
 	
 	; var exists
 	found:
 		mov dh, true
 		
 	finishCheckExistsVar:
+		add sp, 2
 		pop bp
 		ret 2
 endp checkExistsVar
@@ -345,8 +383,7 @@ proc handleVarAndMem
 
 	shr cx, 1 ; stack is divided per words, therefore, should divide iterations by 2
 	
-	mov si, 4 ; location in stack from where the name starts
-	add si, param1
+	mov si, 6 ; location in stack from where the name starts
 
 	; gets name part from the stack and inserts it to the memory
 	getNamePartInsertMem:		
@@ -356,7 +393,7 @@ proc handleVarAndMem
 		
 		; update index
 		add di, 2	
-		sub si, 2
+		add si, 2
 		loop getNamePartInsertMem
 	
 	
@@ -366,7 +403,7 @@ proc handleVarAndMem
 	mov ax, [bp + si]
 	mov [bx + di], ax
 	
-	; move to next paran and next location in memory
+	; move to next param and next location in memory
 	add di, 2
 	add si, 2
 
@@ -404,14 +441,63 @@ start:
 	;call readLineByLine
 	;call closeFile
 	
-	push 50  ; value
+	; insert value to memory
+	push '50'  ; value
 	push string
 	push 'ab'
 	push 'cd'
-	push 'ef'
-	push 6    ; length
+	push 4    ; length
 	call handleVarAndMem
 	
+	; insert value to memory
+	push '30'  ; value
+	push string
+	push 'we'
+	push 'll'
+	push 4    ; length
+	call handleVarAndMem
+	
+	
+	; insert value to memory
+	push '30'  ; value
+	push string
+	push 'po'
+	push 'ab'
+	push 4    ; length
+	call handleVarAndMem
+	
+	; insert value to memory
+	push '30'  ; value
+	push string
+	push 'po'
+	push 'ab'
+	push 4    ; length
+	call handleVarAndMem
+	
+	; insert value to memory
+	push '30'  ; value
+	push string
+	push 'po'
+	push 'a1'
+	push 4    ; length
+	call handleVarAndMem
+	
+	; insert value to memory
+	push '30'  ; value
+	push string
+	push 'p2'
+	push '1b'
+	push 4    ; length
+	call handleVarAndMem
+	
+	
+	; check if value in memory
+	push 'po'
+	push 'a1'
+	push 4
+	call checkExistsVar
+	
+
 	; print memory
 	push memorySize
 	push offset memoryVariables
