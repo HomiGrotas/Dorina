@@ -292,7 +292,7 @@ proc checkExistsVar
 	lea bx, [memoryVariables]
 	xor ax, ax
 	
-	
+	sub ax, 4	; have constant difference of 4 between stack and memory
 	loopingMem:
 		mov cx, [bx + di]  ; length of var name
 
@@ -304,9 +304,7 @@ proc checkExistsVar
 		; if they have same length
 		shr cx, 1  ; word size need half iterations
 		loopingNames:
-			; ToDO: check useful way
 			push [bp + si]
-			sub si, 4	; have constant difference of 4 between stack and memory
 			
 			add si, ax
 			push [bx + si]
@@ -318,7 +316,7 @@ proc checkExistsVar
 			je continueLooping
 			
 			; match -> keep compare the rest of the variables names
-			add si, 6
+			add si, 2
 			loop loopingNames
 		jmp found
 		
@@ -492,8 +490,8 @@ start:
 	
 	
 	; check if value in memory
-	push 'po'
-	push 'a1'
+	push 'p2'
+	push '1b'
 	push 4
 	call checkExistsVar
 	
