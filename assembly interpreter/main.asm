@@ -16,7 +16,10 @@ DATASEG
 ; constants
 false  equ 0
 true   equ 1
-DEBUG  equ true
+DEBUG  equ true	; DEBUG mode
+
+
+
 memorySize equ 500
 lineLength equ 100
 param1 equ [bp + 4]
@@ -41,10 +44,13 @@ filehandle dw '$'					  ; file handle
 
 ; variables for reading the file
 buffer db lineLength dup('#')
+;buffer db 'abc = 5$'
+
 char db '&'
 
 ; messages
-ErrorMsg db 'Error!','$'   ; error message
+ErrorMsgCouldntFindOp db 'Error: couldnt find an operator...', '$'
+ErrorMsgOpen db 'Error: while opening code file...','$'   ; error message
 FinishMsg db 'Finished!', '$' ; finished the program
 
 
@@ -76,74 +82,6 @@ macro printMsg msg_to_print
 	int 21h
 endm	
 
-
-;------------------------------------------------------------------------------------------------------
-;  Files management - Start
-;------------------------------------------------------------------------------------------------------
-; all procedures use constants
-
-proc OpenFile
-	; Open file
-	mov ah, 3Dh
-	xor al, al
-	lea dx, [filename]
-	int 21h
-	jc openerror
-	mov [filehandle], ax
-	ret
-	
-	openerror :
-		mov dx, offset ErrorMsg
-		mov ah, 9h
-		int 21h
-	ret
-endp OpenFile
-
-
-proc readLineByLine
-	
-	xor si, si					  	; buffer length
-    read_line:
-            mov ah, 3Fh      		;read file
-            mov bx, [filehandle]
-            lea dx, [char]			; location to store char
-            mov cx, 1				; read 1 char
-
-            int 21h					; DOS interrupts
-
-            cmp ax, 0     			;EOF (end of file)
-            je EOF
-
-            mov al, [char]			; for comparing the char
-
-            cmp al, 0Ah    			; line feed
-            je LF
-
-            mov [offset buffer + si], al			; location in the buffer
-            inc si					; inc the location in the buffer
-            jmp read_line
-			
-	EOF: ; end of file
-		jmp finish
-	
-	LF:	; line feed - handle the line and return reading
-		push si 
-		call handleOneLineCommand
-		xor si, si				; reset buffer length
-		jmp read_line
-		
-	finish:	
-		ret
-endp readLineByLine
-
-
-proc closeFile
-	mov ah, 3Eh
-	mov bx, [filehandle]
-	int 21h
-	ret
-endp closeFile
-
 ;------------------------------------------------------------------------------------------------------
 ; Helpers procedures - print array, get string, 
 ;------------------------------------------------------------------------------------------------------
@@ -155,6 +93,13 @@ endp closeFile
 proc printArray
 	push bp
 	mov bp, sp
+	
+	push bx
+	push cx
+	push si
+	push ax
+	push dx
+	
 	
 	mov bx, param1	; array length
 	mov cx, param2  ; array offset
@@ -170,6 +115,11 @@ proc printArray
 		inc si
 		loop printLoop
 	
+	pop dx
+	pop ax
+	pop si
+	pop cx
+	pop bx
 	pop bp
 	ret 4
 endp printArray
@@ -219,58 +169,128 @@ endp cmpStrings
 
 
 ;------------------------------------------------------------------------------------------------------
+;  Files management - Start
+;------------------------------------------------------------------------------------------------------
+; all procedures use constants
+
+proc OpenFile
+	; Open file
+	mov ah, 3Dh
+	xor al, al
+	lea dx, [filename]
+	int 21h
+	jc openerror
+	mov [filehandle], ax
+	ret
+	
+	openerror :
+		printMsg ErrorMsgOpen
+		jmp exit
+	ret
+endp OpenFile
+
+
+proc readLineByLine
+	
+	xor si, si					  	; buffer length
+    read_line:
+            mov ah, 3Fh      		;read file
+            mov bx, [filehandle]
+            lea dx, [char]			; location to store char
+            mov cx, 1				; read 1 char
+
+            int 21h					; DOS interrupts
+
+            cmp ax, 0     			;EOF (end of file)
+            je EOF
+
+            mov al, [char]			; for comparing the char
+
+            cmp al, 0Ah    			; line feed
+            je LF
+
+            mov [offset buffer + si], al			; location in the buffer
+            inc si					; inc the location in the buffer
+            jmp read_line
+			
+	EOF: ; end of file
+		jmp finish
+	
+	LF:	; line feed - handle the line and return reading
+		push si 
+		call handleOneLineCommand
+		xor si, si				; reset buffer length
+		jmp read_line
+		
+	finish:	
+		ret
+endp readLineByLine
+
+
+proc closeFile
+	mov ah, 3Eh
+	mov bx, [filehandle]
+	int 21h
+	ret
+endp closeFile
+
+
+;------------------------------------------------------------------------------------------------------
 ; Handlers procedures - understand command 
 ;------------------------------------------------------------------------------------------------------
+
+;-----------------------------------
+; handleOneLineCommand procedure
+; param: buffer length
+;-----------------------------------
 proc handleOneLineCommand
 	push bp
 	mov bp, sp
 	
-	sub sp, 6 ; 3 local vars - first element, operator, second element
-	
 	push ax
 	push bx
-	push si
-	push dx
+	push cx
+
 	
 	; print if in DEBUG mode
 	mov ah, DEBUG
 	cmp ah, 0
-	je finishHandleOneLineCommand
+	je cmpOp
 	
 	; print line
-	mov ax, param1    			; buffer length
+	mov cx, param1    			; buffer length
 	lea bx, [buffer]			; buffer offset
 	
+	
 	; print array
-	push ax
+	push cx
 	push bx
 	call printArray
-		
 	
-	findVar:
-		; ToDO: handle 1 char var name
+	cmpOp:
+		push cx
+		call findOp
 		
-		; load var and value
-		mov dh, [bx]
-		mov dl, [bx + 1]
+		cmp dx, '='
+		je handleAssignment
 		
-		mov ah, [bx + 3]
-		mov al, [bx + 4]
-		
-		push ax
-		push dx
-		call handleVarAndMem
-		
+		printMsg ErrorMsgCouldntFindOp
+		jmp exit
+	
+	handleAssignment:
+		push cx
+		call assignemtFromBuffer	
+	
 	finishHandleOneLineCommand:
-		pop dx
-		pop si
+		pop cx
 		pop bx
 		pop ax
 		
-		add sp, 6
 		pop bp
 		ret 2
 endp handleOneLineCommand
+
+
 
 ;-------------------------------------------
 ; checkExistsVar procedure
@@ -353,7 +373,7 @@ endp checkExistsVar
 ; params: var name length, var name, var value
 ; mem:[length, name, type, value, length, name, type, value...]
 ;---------------------------------------------------------------
-proc handleVarAndMem
+proc insertVarToMemory
 	push bp
 	mov bp, sp
 	
@@ -423,10 +443,114 @@ proc handleVarAndMem
 	pop ax
 	pop bp
 	ret 
-endp handleVarAndMem
+endp insertVarToMemory
 
 
 
+;----------------------------------
+; findOp procedure
+; param: buffer length
+; return dx (operator)
+;----------------------------------
+proc findOp
+	push bp
+	mov bp, sp
+	
+	push ax
+	push bx
+	push cx
+	push si
+	
+	mov cx, param1    			; buffer length
+	lea bx, [buffer]			; buffer offset
+	xor si, si
+	xor dh, dh
+	
+	loopSearch:
+		mov al, [bx + si]
+		inc si
+		cmp al, ' '
+		jne loopSearch
+	
+	mov dl, [bx + si]
+	mov al, [bx + si + 1]
+	cmp al, ' '
+	je finishFindOp
+	
+	mov dh, dl
+	mov dl, [bx + si + 1]
+	
+	finishFindOp:
+		pop si
+		pop cx
+		pop bx
+		pop ax
+		pop bp
+		ret 2
+endp findOp
+
+
+;
+; assignemtFromBuffer procedure
+;
+proc assignemtFromBuffer
+	push bp
+	mov bp, sp
+	
+	push ax
+	push bx
+	push cx
+	push si
+	
+	xor ah, ah
+	lea bx, [buffer]	; buffer offset
+	mov cx, param1		; buffer length
+	mov si, cx
+	
+	sub si, 2
+	mov al, [byte ptr bx + si]   ; variable value
+	; ToDO: check type
+	
+	push ax
+	push string
+	xor si, si
+	
+	; push until space char
+	pushLoop:
+		mov al, [bx + si]
+		cmp al, ' '
+		je callInsertion
+		
+		inc si
+		mov ah, [bx + si]
+		cmp ah, ' '
+		je callInsertion1Var
+		
+		inc si
+		push ax
+		jmp pushLoop
+	
+	; push char if remained
+	callInsertion1Var:
+		xor ah, ah
+		push ax
+		
+	callInsertion:
+		sub cx, 4
+		push cx  ; var name length
+		call insertVarToMemory
+	
+	add sp, 6
+	add sp, cx
+	
+	pop si
+	pop cx
+	pop bx
+	pop ax
+	
+	pop bp
+	ret 2
+endp assignemtFromBuffer
 
 ;----------------
 ; START
@@ -435,80 +559,27 @@ start:
 	mov ax, @data
 	mov ds, ax
 
-	;call OpenFile
-	;call readLineByLine
-	;call closeFile
+	call OpenFile
+	call readLineByLine
+	call closeFile
 	
-	; insert value to memory
-	push '50'  ; value
-	push string
-	push 'ab'
-	push 'cd'
-	push 4    ; length
-	call handleVarAndMem
+	; if debug mode is on - print memory
+	mov ah, DEBUG
+	cmp ah, 0
+	je exit
 	
-	; insert value to memory
-	push '30'  ; value
-	push string
-	push 'we'
-	push 'll'
-	push 4    ; length
-	call handleVarAndMem
-	
-	
-	; insert value to memory
-	push '30'  ; value
-	push string
-	push 'po'
-	push 'ab'
-	push 4    ; length
-	call handleVarAndMem
-	
-	; insert value to memory
-	push '30'  ; value
-	push string
-	push 'po'
-	push 'ab'
-	push 4    ; length
-	call handleVarAndMem
-	
-	; insert value to memory
-	push '30'  ; value
-	push string
-	push 'po'
-	push 'a1'
-	push 4    ; length
-	call handleVarAndMem
-	
-	; insert value to memory
-	push '30'  ; value
-	push string
-	push 'p2'
-	push '1b'
-	push 4    ; length
-	call handleVarAndMem
-	
-	
-	; check if value in memory
-	push 'p2'
-	push '1b'
-	push 4
-	call checkExistsVar
-	
-
 	; print memory
 	push memorySize
 	push offset memoryVariables
 	call printArray
-		
+
+
+exit:
 	newLine
 	newLine
 	newLine
 	newLine
 	printMsg FinishMsg
-
-
-exit: 
 	mov ax, 4c00h
 	int 21h
 	END start
