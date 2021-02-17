@@ -1,2 +1,2 @@
-myName = 5
+hi = 5
 value = 3
