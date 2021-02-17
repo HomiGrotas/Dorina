@@ -3,11 +3,10 @@ MODEL small
 STACK 100h
 
 ; ToDO:
-;	    handle big var names - Done
 ;		math operators
-;		interpret location assignments
-;		insert value procedure
 ;		get value procedure
+;		insert only if var doesnt exists
+;		handle shout command
 
 ; HowTo: get var name: insert var length, insert to stack 2 by 2  mem:[length, name, type, value, length, name, type, value...]
 
@@ -536,20 +535,28 @@ proc assignemtFromBuffer
 		push ax
 		
 	callInsertion:
-		sub cx, 4
-		push cx  ; var name length
-		call insertVarToMemory
+		sub cx, 4  ; type, val
+		
+		; check if var name length is even
+		test cx, 1
+		jz pushEven
+		dec cx ; make length even
+		
+		pushEven:
+			push cx  ; var name length
+			call insertVarToMemory
 	
-	add sp, 6
-	add sp, cx
-	
-	pop si
-	pop cx
-	pop bx
-	pop ax
-	
-	pop bp
-	ret 2
+	finishAssignemtFromBuffer:
+		add sp, 6
+		add sp, cx
+		
+		pop si
+		pop cx
+		pop bx
+		pop ax
+		
+		pop bp
+		ret 2
 endp assignemtFromBuffer
 
 ;----------------
