@@ -3,10 +3,8 @@ MODEL small
 STACK 100h
 
 ; ToDO:
-;		insert only if var doesnt exists
-;		print
-;		math operators
 ;		get value procedure
+;		math operators
 ;		handle shout command
 
 ; HowTo: get var name: insert var length, insert to stack 2 by 2  mem:[length, name, type, value, length, name, type, value...]
@@ -369,7 +367,7 @@ proc checkExistsVar
 		keepLooping:
 			; point to next variable
 			add si, [bx + si]	; si += var name length 
-			add si, 6			; si += 6 (type, length, move to next var)
+			add si, 5			; si += 5 (type 1, length 2, move to next var 1)
 			
 			cmp si, [memoryInd]	; keep looping while si < memoryInd
 			jb loopMemory
@@ -402,8 +400,6 @@ endp checkExistsVar
 proc insertVarToMemory
 	push bp
 	mov bp, sp
-	
-								; handle odd length
 	sub sp, 2
 	
 	; save registers
@@ -437,12 +433,12 @@ proc insertVarToMemory
 		
 		
 		; handle odd name length (memoryInd -= 1)
-		;test si, 1
-		;jz continue
+		test si, 1
+		jz continue
 		
-		;mov ax, [memoryInd]
-		;dec ax
-		;mov [memoryInd], ax
+		mov ax, [memoryInd]
+		dec ax
+		mov [memoryInd], ax
 		
 		continue:
 		; insert type
@@ -452,7 +448,14 @@ proc insertVarToMemory
 		inc di
 		mov al, [buffer + si + 3]
 		mov ah, [buffer + si + 4]
-		mov  [memoryVariables + di], ax
+		
+		; if the second char is carriage return - insert just the first char
+		cmp ah, 13 ; carriage return
+		jne insert2Val
+		xor ah, ah
+		
+		insert2Val:
+			mov  [memoryVariables + di], ax
 
 	
 	finishInserting:
