@@ -354,6 +354,7 @@ proc checkExistsVar
 	
 	push ax
 	push bx
+	push cx
 	push si
 	push di
 		
@@ -414,14 +415,15 @@ proc checkExistsVar
 	found:
 		mov dh, true
 		
-	finishCheckExistsVar:
-		add sp, 2
-		
+	finishCheckExistsVar:		
 		pop di
 		pop si
+		pop cx
 		pop bx
 		pop ax
 		
+		add sp, 2
+
 		pop bp
 		ret 2
 endp checkExistsVar
@@ -590,14 +592,28 @@ proc assignemtFromBuffer
 		dec cx ; make length even
 		
 		pushEven:
+			; check if var already exists
 			push cx  ; var name length
+			call checkExistsVar
+			cmp dh, 1
+			je finishAssignemtFromBufferNoPushes
+			
+			; if var doesn't exists - insert to mem
+			push cx
 			call insertVarToMemory
 	
+	jmp finishAssignemtFromBuffer
+	
+	finishAssignemtFromBufferNoPushes:
+		; reverse local pushes
+		add sp, 8
+		add sp, cx
+
 	finishAssignemtFromBuffer:
+		; reverse param pushes
 		add sp, 6
 		add sp, cx
 	
-	finishAssignemtFromBufferNoPushes:
 		pop si
 		pop cx
 		pop bx
@@ -617,15 +633,6 @@ start:
 	call OpenFile
 	call readLineByLine
 	call closeFile
-	
-	mov [buffer], 'h'
-	mov [buffer+1], 'i'
-
-
-	push 2    ; length
-	call checkExistsVar
-	cmp dh, 1
-	je exit
 	
 	; if debug mode is on - print memory
 	mov ah, DEBUG
