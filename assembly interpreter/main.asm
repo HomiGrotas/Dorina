@@ -42,12 +42,12 @@ filehandle dw '$'					  ; file handle
 
 ; variables for reading the file
 buffer db lineLength dup('#')
-
 char db '&'
 
 ; messages
 ErrorMsgCouldntFindOp db 'Error: couldnt find an operator...', '$'
 ErrorMsgOpen db 'Error: while opening code file...','$'   ; error message
+MemoryPrintMsg db '----------------------  MEMORY ----------------------', '$'
 FinishMsg db 'Finished!', '$' ; finished the program
 
 CODESEG
@@ -79,35 +79,6 @@ macro printMsg msg_to_print
     mov dx, offset &msg_to_print
 	mov ah, 9h
 	int 21h
-endm	
-
-
-;-------------------------------------------
-; Macro: pushSpace
-;   macro to push to stack until reaches space char (' ')
-;-------------------------------------------
-macro pushSpace
-	local pushLoop, callInsertion1Var, finishPushSpace
-	pushLoop:
-		mov al, [bx + si]
-		cmp al, ' '
-		je finishPushSpace
-		
-		inc si
-		mov ah, [bx + si]
-		cmp ah, ' '
-		je callInsertion1Var
-		
-		inc si
-		push ax
-		jmp pushLoop
-	
-	; push char if remained
-	callInsertion1Var:
-		xor ah, ah
-		push ax
-	
-	finishPushSpace:
 endm
 
 
@@ -130,8 +101,8 @@ proc printArray
 	push dx
 	
 	
-	mov bx, param1	; array length
-	mov cx, param2  ; array offset
+	mov bx, param1	; array offset 
+	mov cx, param2  ; array length
 	xor si, si
 	
 	newLine
@@ -149,6 +120,7 @@ proc printArray
 	pop si
 	pop cx
 	pop bx
+	
 	pop bp
 	ret 4
 endp printArray
@@ -169,37 +141,37 @@ proc cmpStrings
 	push bx
 	push cx
 	
-	mov cx, param1 ; length
+	mov cx, param1 ; length of var name
+	shr cx, 1	   ; comparing word size
 	
 	mov si, param2 ; offset for first name
 	mov bx, param3 ; offset for second name
-	add bx, cx
 	
-	; handle odd length
-	test cx, 1
-	je continueCmp
-	mov [word ptr bx], 0
-	inc bx
-	inc cx
-	
-	continueCmp:
-	xor di, di
-	sub di, 2
-	
-	shr cx, 1
-	; loop through the two names
+	; loop through the two names (checks in pairs for effiecenty)
 	cmpLoop:
-		mov ax, [bx + di]
+		mov ax, [bx]
 		mov dx, [si]
 		cmp ax, dx
 		jne notEq
 		
-		sub di, 2
 		add si, 2
+		add bx, 2
 		loop cmpLoop
-		
-	mov dh, true ; default return value - equal
-	jmp finishCmpStrings
+	
+	
+	mov ax, param1
+	test ax, 1
+	jz equals
+	
+	; compare digit that was left
+	mov ah, [byte ptr bx]
+	mov dh, [byte ptr si]
+	cmp ah, dh
+	jne notEq
+	
+	equals:
+		mov dh, true ; default return value - equal
+		jmp finishCmpStrings
 	
 	notEq:
 		xor dh, dh ; 0- not equal
@@ -343,14 +315,13 @@ endp handleOneLineCommand
 ;-------------------------------------------
 ; checkExistsVar procedure
 ; checks whether a variable exists in the memory
-; params: var name length, var name
+; params: var name length, uses buffer)
 ; returns: dh (0/ 1)
 ;-------------------------------------------
 proc checkExistsVar
 	push bp
 	mov bp, sp
 	
-	sub sp, 2
 	
 	push ax
 	push bx
@@ -358,54 +329,49 @@ proc checkExistsVar
 	push si
 	push di
 		
-	mov ax, param1 ; var name length
+	mov ax, param1 ; buffer length
+	
 	mov cx, offset buffer
 	xor dh, dh
-	mov localVar1, ax
-	; make even length
-	test ax, 1
-	je continue
-	inc ax
 
-	continue:
 	lea bx, [memoryVariables]
 	xor si, si	   ; memory index
 	
 	; finish if memory is empty
 	cmp si, [memoryInd]
-	je finishCheckExistsVar
+	je finishCheckExistsVar  ; memoryInd == 0
 	
 	; keep checking while si < memoryInd
 	loopMemory:
 		; check have same length
 		mov dx, [bx + si]
 		cmp dx, ax
-		jne keepLoopingNoLength
-	
+		jne keepLooping
+		
+		; skip length
 		add si, 2
 		add bx, si
 
 		; compare names
-		push cx
-		push bx
-		push localVar1 ; variable length
+		push cx		; buffer offset
+		push bx		; memory offset
+		push ax 	; variable length
 		call cmpStrings
+		
+		; return to original pointer
 		sub bx, si
+		sub si, 2
 		
 		; if names are equal
 		cmp dh, true
 		je found
-		
-		jmp keepLooping
-		keepLoopingNoLength:
-			add si, 2
-		
+				
 		keepLooping:
 			; point to next variable
-			add si, [bx + si - 2]
-			add si, 4
+			add si, [bx + si]	; si += var name length 
+			add si, 6			; si += 6 (type, length, move to next var)
 			
-			cmp si, [memoryInd]
+			cmp si, [memoryInd]	; keep looping while si < memoryInd
 			jb loopMemory
 	
 	xor dh, dh	   ; default - var doesn't exists
@@ -422,8 +388,6 @@ proc checkExistsVar
 		pop bx
 		pop ax
 		
-		add sp, 2
-
 		pop bp
 		ret 2
 endp checkExistsVar
@@ -432,12 +396,15 @@ endp checkExistsVar
 
 ;---------------------------------------------------------------
 ; handle var and memory procedure - inserts new var to memory
-; params: var name length, var name, var value
+; params: None
 ; mem:[length, name, type, value, length, name, type, value...]
 ;---------------------------------------------------------------
 proc insertVarToMemory
 	push bp
 	mov bp, sp
+	
+								; handle odd length
+	sub sp, 2
 	
 	; save registers
 	push ax
@@ -446,65 +413,61 @@ proc insertVarToMemory
 	push dx
 	push di
 	
+	xor si, si				; buffer index
+	mov di, [memoryInd]		; memory index
+	mov localVar1, di
+	add di, 2				; save location for length
 	
-	; get name length
-	mov cx, param1
-	lea bx, [memoryVariables]
-	mov di, [memoryInd]
-	
-	
-	; add var name length to mem
-	mov [bx + di], cx
-	add di, 2
-
-	; update memory index
-	add [memoryInd], cx
-	add [memoryInd], 6 ; 2 for name, type, value
-
-	shr cx, 1 ; stack is divided per words, therefore, should divide iterations by 2
-	
-	mov si, 6 ; location in stack from where the name starts
-
-	; gets name part from the stack and inserts it to the memory
-	getNamePartInsertMem:		
-		; get word from stack and insert to memory
-		mov ax, [bp + si]
-		mov [bx + di], ax
+	insertName:
+		mov ah, [buffer + si]
+		inc si
 		
-		; update index
-		add di, 2	
-		add si, 2
-		loop getNamePartInsertMem
+		cmp ah, ' '									; stop inserting if reached a space (' ')
+		je finishedInsertName
+		
+		mov [byte ptr memoryVariables + di], ah		; mov char to memory
+		inc di										; move to next location in memory
+		jmp insertName
 	
-	
-	; insert var type
-	mov si, 6
-	add si, param1
-	mov ax, [bp + si]
-	mov [bx + di], ax
-	
-	; move to next param and next location in memory
-	add di, 2
-	add si, 2
-
-	
-	; insert value to memory - after the var name
-	mov ax, [bp + si]
-	mov [bx + di], ax
+	finishedInsertName:
+		; insert length
+		mov bx, localVar1
+		dec si
+		mov [bx], si
 		
 		
-	; return sp to its original value
-	sub di, [memoryInd]
-	add di, 2  ; original address location on stack
-	add sp, di
+		; handle odd name length (memoryInd -= 1)
+		;test si, 1
+		;jz continue
+		
+		;mov ax, [memoryInd]
+		;dec ax
+		;mov [memoryInd], ax
+		
+		continue:
+		; insert type
+		mov  [byte ptr memoryVariables + di], string
+		
+		; insert value
+		inc di
+		mov al, [buffer + si + 3]
+		mov ah, [buffer + si + 4]
+		mov  [memoryVariables + di], ax
+
 	
-	pop di
-	pop dx
-	pop cx
-	pop bx
-	pop ax
-	pop bp
-	ret 
+	finishInserting:
+		add [memoryInd], si	; length of name
+		add [memoryInd], 6	; length, value, type
+		
+		add sp, 2
+		
+		pop di
+		pop dx
+		pop cx
+		pop bx
+		pop ax
+		pop bp
+		ret 
 endp insertVarToMemory
 
 
@@ -554,7 +517,7 @@ endp findOp
 
 ;
 ; assignemtFromBuffer procedure
-;
+; param: buffer length
 proc assignemtFromBuffer
 	push bp
 	mov bp, sp
@@ -569,51 +532,23 @@ proc assignemtFromBuffer
 	mov cx, param1		; buffer length
 	mov si, cx
 	
-	sub si, 2
-	mov al, [byte ptr bx + si]   ; variable value
-	
-	
-	; check whether var already exists
-	
-	; ToDO: check type
-	push ax	 	 ; var value
-	push string  ; var type
-	
-	; push until space char
+	sub si, 2 ; remove carriage return
 	xor si, si
-	pushSpace
 		
 	callInsertion:
-		sub cx, 4  ; type, val
+		sub cx, 6  ; type, val
 		
-		; check if var name length is even
-		test cx, 1
-		jz pushEven
-		dec cx ; make length even
+		; check if var already exists
+		push cx  ; var name length
+		call checkExistsVar
+		cmp dh, 1
+		je finishAssignemtFromBuffer
 		
-		pushEven:
-			; check if var already exists
-			push cx  ; var name length
-			call checkExistsVar
-			cmp dh, 1
-			je finishAssignemtFromBufferNoPushes
-			
-			; if var doesn't exists - insert to mem
-			push cx
-			call insertVarToMemory
+		; if var doesn't exists - insert to mem
+		call insertVarToMemory
 	
-	jmp finishAssignemtFromBuffer
-	
-	finishAssignemtFromBufferNoPushes:
-		; reverse local pushes
-		add sp, 8
-		add sp, cx
-
 	finishAssignemtFromBuffer:
 		; reverse param pushes
-		add sp, 6
-		add sp, cx
-	
 		pop si
 		pop cx
 		pop bx
@@ -629,17 +564,21 @@ endp assignemtFromBuffer
 start:
 	mov ax, @data
 	mov ds, ax
-
+	
 	call OpenFile
 	call readLineByLine
 	call closeFile
-	
+		
 	; if debug mode is on - print memory
 	mov ah, DEBUG
 	cmp ah, 0
 	je exit
 	
 	; print memory
+	newLine
+	newLine
+	newLine
+	printMsg MemoryPrintMsg
 	push memorySize
 	push offset memoryVariables
 	call printArray
