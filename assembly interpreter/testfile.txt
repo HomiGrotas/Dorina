@@ -1,12 +1,5 @@
-hi_you! = 2
-hi_you! = 20
-hi! = 5
-hi! = 50
-hi! = 50
-hi = 50
-hi = 50
-hi = 50
-hi_you! = 20
-hi! = 50
-hi! = 50
-hi_you = 20
+hi_you = 2
+hi_you = 10
+hi_you = 1
+var = 3
+var = 30

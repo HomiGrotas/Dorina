@@ -191,6 +191,10 @@ endp cmpStrings
 ;------------------------------------------------------------------------------------------------------
 ; all procedures use constants
 
+;-------------------------
+; open file procedure
+; opens file which his name is in filename variable
+;-------------------------
 proc OpenFile
 	; Open file
 	mov ah, 3Dh
@@ -208,8 +212,11 @@ proc OpenFile
 endp OpenFile
 
 
+;---------------------------------------------
+; readLineByLine procedure
+; reads whole line and calcs its length
+;---------------------------------------------
 proc readLineByLine
-	
 	xor si, si					  	; buffer length
     read_line:
             mov ah, 3Fh      		;read file
@@ -234,17 +241,19 @@ proc readLineByLine
 	EOF: ; end of file
 		jmp finish
 	
-	LF:	; line feed - handle the line and return reading
-		push si 
+	LF:	; line feed - handle the line and return reading		
+		push si 	; buffer length
 		call handleOneLineCommand
 		xor si, si				; reset buffer length
-		jmp read_line
+		jmp read_line			; keep reading
 		
 	finish:	
 		ret
 endp readLineByLine
 
-
+;--------------------
+; closeFile procedure
+;---------------------
 proc closeFile
 	mov ah, 3Eh
 	mov bx, [filehandle]
@@ -314,7 +323,7 @@ endp handleOneLineCommand
 ; checkExistsVar procedure
 ; checks whether a variable exists in the memory
 ; params: var name length, uses buffer)
-; returns: dh (0/ 1)
+; returns: dh (0/ 1), si: index in memory
 ;-------------------------------------------
 proc checkExistsVar
 	push bp
@@ -324,7 +333,6 @@ proc checkExistsVar
 	push ax
 	push bx
 	push cx
-	push si
 	push di
 		
 	mov ax, param1 ; buffer length
@@ -333,6 +341,19 @@ proc checkExistsVar
 	xor dh, dh
 
 	lea bx, [memoryVariables]
+	
+	push ax
+	call getValFromBuffer
+	cmp ax, 3031
+	jnb lengthOk
+	
+	
+	pop ax
+	inc ax
+	push ax
+	
+	lengthOk:
+	pop ax
 	xor si, si	   ; memory index
 	
 	; finish if memory is empty
@@ -367,7 +388,7 @@ proc checkExistsVar
 		keepLooping:
 			; point to next variable
 			add si, [bx + si]	; si += var name length 
-			add si, 5			; si += 5 (type 1, length 2, move to next var 1)
+			add si, 6			; si += 6 (type 1, length 2, move to next var 2)
 			
 			cmp si, [memoryInd]	; keep looping while si < memoryInd
 			jb loopMemory
@@ -378,10 +399,10 @@ proc checkExistsVar
 	; var exists
 	found:
 		mov dh, true
+		mov bx, si	; index of the start of the variable in memory
 		
 	finishCheckExistsVar:		
 		pop di
-		pop si
 		pop cx
 		pop bx
 		pop ax
@@ -494,17 +515,20 @@ proc findOp
 	xor si, si
 	xor dh, dh
 	
+	; loop until reaches a space
 	loopSearch:
 		mov al, [bx + si]
 		inc si
 		cmp al, ' '
 		jne loopSearch
 	
+	; check if operator is one char
 	mov dl, [bx + si]
 	mov al, [bx + si + 1]
 	cmp al, ' '
 	je finishFindOp
 	
+	; move 2 chars operator to dx
 	mov dh, dl
 	mov dl, [bx + si + 1]
 	
@@ -518,9 +542,10 @@ proc findOp
 endp findOp
 
 
-;
+;---------------------------------
 ; assignemtFromBuffer procedure
 ; param: buffer length
+;---------------------------------
 proc assignemtFromBuffer
 	push bp
 	mov bp, sp
@@ -538,17 +563,28 @@ proc assignemtFromBuffer
 	sub si, 2 ; remove carriage return
 	xor si, si
 		
-	callInsertion:
-		sub cx, 6  ; type, val
+	; callInsertion
+	sub cx, 6  							; type, val, length
+	
+	; check if var already exists
+	push cx  							; var name length
+	call checkExistsVar
+	
+	; check if var exists
+	cmp dh, 1
+	je updateVal
+	
+	; if var doesn't exists - insert to mem
+	call insertVarToMemory
 		
-		; check if var already exists
-		push cx  ; var name length
-		call checkExistsVar
-		cmp dh, 1
-		je finishAssignemtFromBuffer
-		
-		; if var doesn't exists - insert to mem
-		call insertVarToMemory
+	jmp finishAssignemtFromBuffer
+	
+	updateVal:
+		call getValFromBuffer		; ax <- new value
+		push ax
+		push si
+		call updateValProc			; update the variable value
+
 	
 	finishAssignemtFromBuffer:
 		; reverse param pushes
@@ -561,6 +597,101 @@ proc assignemtFromBuffer
 		ret 2
 endp assignemtFromBuffer
 
+
+
+;----------------------------------
+;	getValue (from memory) procedure
+; params: index of variable
+; returns: dx - value of variable
+;----------------------------------
+proc getValue
+	push bp
+	mov bp, sp
+	
+	push bx
+		
+	; bx should point for the length of the variable
+	lea bx, [memoryVariables]
+	add bx, param1
+	
+	; skip var name
+	add bx, [bx] ; bx += var name length
+	mov dx, [bx + 4]
+		
+	pop bx
+	pop bp
+	ret 2
+endp getValue
+
+;----------------------------------
+; updateVal procedure
+; params: value index, new value
+;----------------------------------
+proc updateValProc
+	push bp
+	mov bp, sp
+	
+	mov dx, param2		; new value
+	lea bx, [memoryVariables]
+	
+	; skip var name
+	add bx, [bx] ; bx += var name length
+	
+	; update value
+	mov [bx + 3], dx  ; skip type and move to val area
+	
+	pop bp
+	ret 4
+endp updateValProc
+
+
+;----------------------------------------
+; 	getValFromBuffer procedure
+; returns: ax
+;----------------------------------------
+proc getValFromBuffer
+	push bp
+	mov bp, sp
+	
+	; save registers
+	push bx
+	push cx
+	push dx
+	push di
+	
+	xor si, si				; buffer index
+	loopBuffer:
+		mov ah, [buffer + si]
+		inc si
+		cmp ah, ' '									; stop inserting if reached a space (' ')
+		je finishedLoopingNameBuffer
+		jmp loopBuffer		; keep looping
+	
+	finishedLoopingNameBuffer:
+		mov al, [buffer + si + 2]
+		mov ah, [buffer + si + 3]
+	
+	; if the second char is carriage return - insert just the first char
+	cmp ah, 13 					; carriage return
+	jne finishLoopingBuffer
+	xor ah, ah
+	
+	finishLoopingBuffer:		
+		pop di
+		pop dx
+		pop cx
+		pop bx
+		pop bp
+		ret 
+endp getValFromBuffer
+
+
+
+
+
+
+
+
 ;----------------
 ; START
 ;----------------
@@ -571,6 +702,7 @@ start:
 	call OpenFile
 	call readLineByLine
 	call closeFile
+	
 		
 	; if debug mode is on - print memory
 	mov ah, DEBUG
