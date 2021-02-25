@@ -1,5 +1,4 @@
-hi_you = 2
-hi_you = 10
-hi_you = 1
-var = 3
-var = 30
+var = 5
+shout "Hello World!"
+var = 0
+shout "My name is Nadav and I'm the creator"

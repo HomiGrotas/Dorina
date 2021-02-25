@@ -14,7 +14,7 @@ DATASEG
 ; constants
 false  equ 0
 true   equ 1
-DEBUG  equ true	; DEBUG mode
+DEBUG  equ false	; DEBUG mode
 
 memorySize equ 500
 lineLength equ 100
@@ -36,14 +36,17 @@ memoryInd dw 0 ; can be up to 65,535
 
 ; variables for file opening
 filename db 'testfile.txt',0	  ; file to operate on
-filehandle dw '$'					  ; file handle
+filehandle dw '.'					  ; file handle
 
 ; variables for reading the file
 buffer db lineLength dup('#')
 char db '&'
 
+; keywords
+shoutKeyword db 'shout'
+
 ; messages
-ErrorMsgCouldntFindOp db 'Error: couldnt find an operator...', '$'
+ErrorMsgCouldntFindOp db 'Error: couldnt find an operator or a keyword...', '$'
 ErrorMsgOpen db 'Error: while opening code file...','$'   ; error message
 MemoryPrintMsg db '----------------------  MEMORY ----------------------', '$'
 FinishMsg db 'Finished!', '$' ; finished the program
@@ -289,7 +292,7 @@ proc handleOneLineCommand
 	lea bx, [buffer]			; buffer offset
 	
 	
-	; print array
+	; print buffer
 	push cx
 	push bx
 	call printArray
@@ -298,16 +301,29 @@ proc handleOneLineCommand
 		push cx
 		call findOp
 		
+		; check if operator is '='
 		cmp dx, '='
 		je handleAssignment
+		
+		; check if shout keyword is used
+		push offset shoutKeyword
+		push offset buffer
+		push 5
+		call cmpStrings
+		cmp dh, true
+		je handleShout
 		
 		printMsg ErrorMsgCouldntFindOp
 		jmp exit
 	
-	handleAssignment:
+	handleAssignment:				; = operator
 		push cx
-		call assignemtFromBuffer	
-	
+		call assignemtFromBuffer
+		jmp finishHandleOneLineCommand
+		
+	handleShout:					; shout keyword
+		call handleShoutKeyword
+		
 	finishHandleOneLineCommand:
 		pop cx
 		pop bx
@@ -317,6 +333,40 @@ proc handleOneLineCommand
 		ret 2
 endp handleOneLineCommand
 
+
+;-----------------------------------------
+; handle shout keyword procedure
+;	checks if content is a string/ var and prints accordingly
+;-----------------------------------------
+proc handleShoutKeyword
+	push bp
+	mov bp, sp
+	
+	push ax
+	push dx
+	mov si, 6	; 5 shout length, 1 stand on command content
+	inc si		; 1 "
+	mov ah, 2	; write char
+	
+	newLine
+	shoutPrintLoop:
+		mov dl, [buffer + si]
+		cmp dl, '"'
+		je finishHandleShoutKeyword
+		
+		int 21h
+		
+		inc si
+		jmp shoutPrintLoop
+	
+	finishHandleShoutKeyword:
+		newLine					; go a line down in console
+		pop dx
+		pop ax
+		
+		pop bp
+		ret
+endp handleShoutKeyword
 
 
 ;-------------------------------------------
@@ -412,6 +462,8 @@ endp checkExistsVar
 
 
 
+
+
 ;---------------------------------------------------------------
 ; handle var and memory procedure - inserts new var to memory
 ; params: None
@@ -451,15 +503,6 @@ proc insertVarToMemory
 		; insert length
 		mov bx, localVar1
 		mov [bx], si
-		
-		
-		; handle odd name length (memoryInd -= 1)
-		;test si, 1
-		;jz continue
-		
-		;mov ax, [memoryInd]
-		;dec ax
-		;mov [memoryInd], ax
 		
 		continue:
 		; insert type
@@ -683,12 +726,6 @@ proc getValFromBuffer
 		pop bp
 		ret 
 endp getValFromBuffer
-
-
-
-
-
-
 
 
 ;----------------
