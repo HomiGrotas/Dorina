@@ -139,7 +139,7 @@ proc cmpStrings
 	push bx
 	push cx
 	
-	mov cx, param1 ; length of var name
+	mov cx, param1 ; length of var name					
 	shr cx, 1	   ; comparing word size
 	
 	mov si, param2 ; offset for first name
@@ -331,7 +331,6 @@ proc checkExistsVar
 	
 	
 	push ax
-	push bx
 	push cx
 	push di
 		
@@ -342,6 +341,7 @@ proc checkExistsVar
 
 	lea bx, [memoryVariables]
 	
+	; handle odd buffer length
 	push ax
 	call getValFromBuffer
 	cmp ax, 3031
@@ -388,7 +388,7 @@ proc checkExistsVar
 		keepLooping:
 			; point to next variable
 			add si, [bx + si]	; si += var name length 
-			add si, 6			; si += 6 (type 1, length 2, move to next var 2)
+			add si, 5			; si += 5 (type 1, length 2, 2 val)
 			
 			cmp si, [memoryInd]	; keep looping while si < memoryInd
 			jb loopMemory
@@ -404,7 +404,6 @@ proc checkExistsVar
 	finishCheckExistsVar:		
 		pop di
 		pop cx
-		pop bx
 		pop ax
 		
 		pop bp
@@ -432,34 +431,35 @@ proc insertVarToMemory
 	
 	xor si, si				; buffer index
 	mov di, [memoryInd]		; memory index
+	
 	mov localVar1, di
 	add di, 2				; save location for length
 	
 	insertName:
 		mov ah, [buffer + si]
-		inc si
 		
 		cmp ah, ' '									; stop inserting if reached a space (' ')
 		je finishedInsertName
 		
 		mov [byte ptr memoryVariables + di], ah		; mov char to memory
 		inc di										; move to next location in memory
+		inc si
+		
 		jmp insertName
 	
 	finishedInsertName:
 		; insert length
 		mov bx, localVar1
-		dec si
 		mov [bx], si
 		
 		
 		; handle odd name length (memoryInd -= 1)
-		test si, 1
-		jz continue
+		;test si, 1
+		;jz continue
 		
-		mov ax, [memoryInd]
-		dec ax
-		mov [memoryInd], ax
+		;mov ax, [memoryInd]
+		;dec ax
+		;mov [memoryInd], ax
 		
 		continue:
 		; insert type
@@ -481,7 +481,7 @@ proc insertVarToMemory
 	
 	finishInserting:
 		add [memoryInd], si	; length of name
-		add [memoryInd], 6	; length, value, type
+		add [memoryInd], 5	;  2length, 2value, 1type, 1next location
 		
 		add sp, 2
 		
@@ -582,7 +582,7 @@ proc assignemtFromBuffer
 	updateVal:
 		call getValFromBuffer		; ax <- new value
 		push ax
-		push si
+		push bx						; variable index in memory
 		call updateValProc			; update the variable value
 
 	
@@ -632,7 +632,6 @@ proc updateValProc
 	mov bp, sp
 	
 	mov dx, param2		; new value
-	lea bx, [memoryVariables]
 	
 	; skip var name
 	add bx, [bx] ; bx += var name length
