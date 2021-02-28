@@ -14,7 +14,7 @@ DATASEG
 ; constants
 false  equ 0
 true   equ 1
-DEBUG  equ false	; DEBUG mode
+DEBUG  equ true	; DEBUG mode
 
 memorySize equ 500
 lineLength equ 100
@@ -48,6 +48,7 @@ shoutKeyword db 'shout'
 ; messages
 ErrorMsgCouldntFindOp db 'Error: couldnt find an operator or a keyword...', '$'
 ErrorMsgOpen db 'Error: while opening code file...','$'   ; error message
+ErrorVarDoesntExists db 'Error: var doesnt exists', '$'
 MemoryPrintMsg db '----------------------  MEMORY ----------------------', '$'
 FinishMsg db 'Finished!', '$' ; finished the program
 
@@ -280,7 +281,8 @@ proc handleOneLineCommand
 	push ax
 	push bx
 	push cx
-
+	
+	mov cx, param1    			; buffer length
 	
 	; print if in DEBUG mode
 	mov ah, DEBUG
@@ -288,7 +290,6 @@ proc handleOneLineCommand
 	je cmpOp
 	
 	; print line
-	mov cx, param1    			; buffer length
 	lea bx, [buffer]			; buffer offset
 	
 	
@@ -296,6 +297,7 @@ proc handleOneLineCommand
 	push cx
 	push bx
 	call printArray
+	newLine
 	
 	cmpOp:
 		push cx
@@ -317,11 +319,12 @@ proc handleOneLineCommand
 		jmp exit
 	
 	handleAssignment:				; = operator
-		push cx
+		push cx						; buffer length
 		call assignemtFromBuffer
 		jmp finishHandleOneLineCommand
 		
 	handleShout:					; shout keyword
+		push cx						; buffer length
 		call handleShoutKeyword
 		
 	finishHandleOneLineCommand:
@@ -344,35 +347,75 @@ proc handleShoutKeyword
 	
 	push ax
 	push dx
-	mov si, 6	; 5 shout length, 1 stand on command content
-	inc si		; 1 "
-	mov ah, 2	; write char
+	push bx
+	push cx
 	
-	newLine
-	shoutPrintLoop:
-		mov dl, [buffer + si]
-		cmp dl, '"'
-		je finishHandleShoutKeyword
+	mov cx, param1		; buffer length
+	mov si, 6			; 5 shout length, 1 stand on command content
+	mov ah, 2			; write char
+	
+	; check if need to print a string or a variable
+	mov dl, [buffer + si]
+	cmp dl, '"'
+	jne printVar
+	
+	; printStr:
+		inc si		; 1 "
+		shoutPrintLoop:
+			mov dl, [buffer + si]
+			cmp dl, '"'
+			je finishHandleShoutKeyword
+			
+			int 21h	 ; print char
+			
+			inc si
+			jmp shoutPrintLoop
+	
+	
+	printVar:
+		; check whether var exists and get its index
+		lea bx, [buffer]
+		add bx, si
+		sub cx, 7
 		
+		test cx, 1
+		jz evenLength
+		dec cx		; due to odd length of shout command, the checkExistsVar procedure will increase the var name length by 1
+		
+		evenLength:
+		push bx		; offset of current var
+		push cx		; var name length
+		call checkExistsVar		; bx now holds the var memory index
+		cmp dh, true
+		jne varDoesntExists
+		
+		push bx
+		call getValue	 ; value in dx
 		int 21h
-		
-		inc si
-		jmp shoutPrintLoop
+		xchg dl, dh
+		int 21h
+	
+	jmp finishHandleShoutKeyword
+	varDoesntExists:
+		printMsg ErrorVarDoesntExists
+		newLine
 	
 	finishHandleShoutKeyword:
 		newLine					; go a line down in console
+		pop cx
+		pop bx
 		pop dx
 		pop ax
 		
 		pop bp
-		ret
+		ret 2
 endp handleShoutKeyword
 
 
 ;-------------------------------------------
 ; checkExistsVar procedure
 ; checks whether a variable exists in the memory
-; params: var name length, uses buffer)
+; params: var name length, array offset
 ; returns: dh (0/ 1), si: index in memory
 ;-------------------------------------------
 proc checkExistsVar
@@ -384,9 +427,9 @@ proc checkExistsVar
 	push cx
 	push di
 		
-	mov ax, param1 ; buffer length
+	mov ax, param1 ; var name length
 	
-	mov cx, offset buffer
+	mov cx, param2
 	xor dh, dh
 
 	lea bx, [memoryVariables]
@@ -457,7 +500,7 @@ proc checkExistsVar
 		pop ax
 		
 		pop bp
-		ret 2
+		ret 4
 endp checkExistsVar
 
 
@@ -601,15 +644,13 @@ proc assignemtFromBuffer
 	xor ah, ah
 	lea bx, [buffer]	; buffer offset
 	mov cx, param1		; buffer length
-	mov si, cx
-	
-	sub si, 2 ; remove carriage return
 	xor si, si
 		
 	; callInsertion
-	sub cx, 6  							; type, val, length
+	sub cx, 6  							; get length of var (odd length is handled later)
 	
 	; check if var already exists
+	push offset buffer
 	push cx  							; var name length
 	call checkExistsVar
 	
@@ -617,7 +658,7 @@ proc assignemtFromBuffer
 	cmp dh, 1
 	je updateVal
 	
-	; if var doesn't exists - insert to mem
+	; if var doesn't exists - insert to memory
 	call insertVarToMemory
 		
 	jmp finishAssignemtFromBuffer
@@ -659,7 +700,7 @@ proc getValue
 	
 	; skip var name
 	add bx, [bx] ; bx += var name length
-	mov dx, [bx + 4]
+	mov dx, [bx + 3]	; skip type 1, var name length 2
 		
 	pop bx
 	pop bp

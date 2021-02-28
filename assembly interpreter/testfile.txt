@@ -1,4 +1,8 @@
-var = 5
-shout "Hello World!"
-var = 0
-shout "My name is Nadav and I'm the creator"
+var = hi
+name = oz
+shout var
+shout name
+name = 1
+shout name
+var = 35
+shout var
