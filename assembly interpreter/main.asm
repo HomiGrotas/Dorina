@@ -3,9 +3,12 @@ MODEL small
 STACK 100h
 
 ; ToDO:
-;		get value procedure
-;		math operators
-;		handle shout command
+;		string type update
+;		math operators:   +=, -=, *=, /=
+;		boolean opetatos: >, ==, <, !=
+;		fix bug of one char var name
+;		condition
+;		while loop
 
 ; HowTo: get var name: insert var length, insert to stack 2 by 2  mem:[length, name, type, value, length, name, type, value...]
 
@@ -14,7 +17,7 @@ DATASEG
 ; constants
 false  equ 0
 true   equ 1
-DEBUG  equ true	; DEBUG mode
+DEBUG  equ false	; DEBUG mode
 
 memorySize equ 500
 lineLength equ 100
@@ -307,6 +310,10 @@ proc handleOneLineCommand
 		cmp dx, '='
 		je handleAssignment
 		
+		; check if operator is '+='
+		cmp dx, '+='
+		je handlePlus
+		
 		; check if shout keyword is used
 		push offset shoutKeyword
 		push offset buffer
@@ -322,7 +329,12 @@ proc handleOneLineCommand
 		push cx						; buffer length
 		call assignemtFromBuffer
 		jmp finishHandleOneLineCommand
-		
+	
+	handlePlus:
+		;push cx																						plus is temporarly disabled
+		;call plus
+		jmp finishHandleOneLineCommand
+	
 	handleShout:					; shout keyword
 		push cx						; buffer length
 		call handleShoutKeyword
@@ -389,8 +401,11 @@ proc handleShoutKeyword
 		cmp dh, true
 		jne varDoesntExists
 		
+		; get var value
 		push bx
 		call getValue	 ; value in dx
+		
+		; print value
 		int 21h
 		xchg dl, dh
 		int 21h
@@ -427,15 +442,17 @@ proc checkExistsVar
 	push cx
 	push di
 		
-	mov ax, param1 ; var name length
+	mov ax, param1 		; var name length
 	
-	mov cx, param2
+	mov cx, param2		; var location in buffer
 	xor dh, dh
 
 	lea bx, [memoryVariables]
 	
 	; handle odd buffer length
 	push ax
+	
+	push 1
 	call getValFromBuffer
 	cmp ax, 3031
 	jnb lengthOk
@@ -465,7 +482,7 @@ proc checkExistsVar
 		add bx, si
 
 		; compare names
-		push cx		; buffer offset
+		push cx		; var location in buffer
 		push bx		; memory offset
 		push ax 	; variable length
 		call cmpStrings
@@ -548,22 +565,47 @@ proc insertVarToMemory
 		mov [bx], si
 		
 		continue:
-		; insert type
-		mov  [byte ptr memoryVariables + di], string
+
 		
 		; insert value
-		inc di
 		mov al, [buffer + si + 3]
+			
+		
+		inc di
+		cmp al, '"'
+		je insert1ValStr
+		
 		mov ah, [buffer + si + 4]
 		
 		; if the second char is carriage return - insert just the first char
 		cmp ah, 13 ; carriage return
-		jne insert2Val
-		xor ah, ah
+		jne insert2ValInt
+		mov ah, 30h
 		
-		insert2Val:
+		insert2ValInt:
+			sub ah, 30h
+			sub al, 30h
+			
+			; insert type
+			mov  [byte ptr memoryVariables + di - 1], integer
+			
+			; insert value
 			mov  [memoryVariables + di], ax
-
+			jmp finishInserting
+			
+		insert1ValStr:
+			mov al, [buffer + si + 4]
+			mov ah, [buffer + si + 5]
+			cmp ah, '"'
+			jne insert2ValStr
+			xor ah, ah
+			
+			insert2ValStr:
+				; insert type
+				mov  [byte ptr memoryVariables + di - 1], string
+				
+				; insert value
+				mov  [memoryVariables + di], ax
 	
 	finishInserting:
 		add [memoryInd], si	; length of name
@@ -664,9 +706,9 @@ proc assignemtFromBuffer
 	jmp finishAssignemtFromBuffer
 	
 	updateVal:
+		push 1  ; operator length
 		call getValFromBuffer		; ax <- new value
 		push ax
-		push bx						; variable index in memory
 		call updateValProc			; update the variable value
 
 	
@@ -709,13 +751,13 @@ endp getValue
 
 ;----------------------------------
 ; updateVal procedure
-; params: value index, new value
+; params:  new value (uses bx as source index)
 ;----------------------------------
 proc updateValProc
 	push bp
 	mov bp, sp
 	
-	mov dx, param2		; new value
+	mov dx, param1		; new value
 	
 	; skip var name
 	add bx, [bx] ; bx += var name length
@@ -724,12 +766,13 @@ proc updateValProc
 	mov [bx + 3], dx  ; skip type and move to val area
 	
 	pop bp
-	ret 4
+	ret 2
 endp updateValProc
 
 
 ;----------------------------------------
 ; 	getValFromBuffer procedure
+; param: operator length
 ; returns: ax
 ;----------------------------------------
 proc getValFromBuffer
@@ -742,17 +785,20 @@ proc getValFromBuffer
 	push dx
 	push di
 	
+	mov bx, param1	; operator length
+	
 	xor si, si				; buffer index
 	loopBuffer:
 		mov ah, [buffer + si]
 		inc si
-		cmp ah, ' '									; stop inserting if reached a space (' ')
+		cmp ah, ' '									; stop looping if reached a space (' ')
 		je finishedLoopingNameBuffer
 		jmp loopBuffer		; keep looping
 	
 	finishedLoopingNameBuffer:
-		mov al, [buffer + si + 2]
-		mov ah, [buffer + si + 3]
+		add si, bx		; add operator length
+		mov al, [buffer + si + 1]		; get value
+		mov ah, [buffer + si + 2]
 	
 	; if the second char is carriage return - insert just the first char
 	cmp ah, 13 					; carriage return
@@ -765,9 +811,112 @@ proc getValFromBuffer
 		pop cx
 		pop bx
 		pop bp
-		ret 
+		ret 2
 endp getValFromBuffer
 
+
+; checks whether dl holds a digit
+; return: dh (true/ false)
+proc isDigit
+	xor dh, dh
+	
+	; 30h <= dl <= 39h
+	cmp dl, 30h
+	jb isDigitEnd
+	cmp dl, 39h
+	ja isDigitEnd
+	
+	mov dh, true		; dl holds a digit
+	isDigitEnd:
+		ret
+endp isDigit
+
+;--------------------------------------------------------------------------------
+;	math operators
+;--------------------------------------------------------------------------------
+
+;--------------------
+; plus procedure
+
+proc plus
+	push bp
+	mov bp, sp
+	
+	mov cx, param1		; buffer length
+	dec cx
+	
+	; check var length (buffer length - value length - 2 space, 2 operator)
+	push 2
+	call getValFromBuffer
+	cmp ax, 3031
+	jb plusLengthOk
+	
+	dec cx ; 1 val
+	
+	plusLengthOk:
+	sub cx, 5	;  2 space, 2 operator, 1 val
+	
+	; check assigned var exists
+	push offset buffer
+	push cx
+	call checkExistsVar
+	
+	; raise error if var doesnt exists
+	cmp dh, 0
+	je errorVarDoesntExistsPlus
+	
+	; get current var value
+	push si
+	call getValue		; dx hold current value
+	
+	; get value from buffer
+	push 2
+	call getValFromBuffer		; ax holds value from buffer
+	
+	cmp dl, 0
+	jne memLengthOk
+	xchg dh, dl
+	;add dh, 30h
+		
+	memLengthOk:
+	;	sub dh, 30h
+	;	sub dl, 30h
+		
+		cmp ah, 0
+		jne bufferLengthOk
+	;	add ah, 30h
+		
+		bufferLengthOk:
+	;		sub ah, 30h
+	;		sub al, 30h
+			
+			
+			xchg dh, dl
+			add al, dl
+			mov dl, ah
+			xor ah, ah
+			mov bl, 10
+			mul bl
+			add al, dh
+			add al, dl
+			mov dx, ax
+			
+			add dh, 30h
+			add dl, 30h
+			mov ah, 2
+			int 21h
+			xchg dl, dh
+			int 21h
+			
+	jmp finishPlus
+	errorVarDoesntExistsPlus:
+		printMsg ErrorVarDoesntExists
+		jmp exit
+	
+	finishPlus:
+		pop bp
+		ret 2
+endp plus
 
 ;----------------
 ; START
