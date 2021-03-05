@@ -1,8 +1,4 @@
-var = hi
-name = oz
+var = 52
+var += 9
 shout var
-shout name
-name = 1
-shout name
-var = 35
-shout var
+shout "hello there"

@@ -17,7 +17,7 @@ DATASEG
 ; constants
 false  equ 0
 true   equ 1
-DEBUG  equ false	; DEBUG mode
+DEBUG  equ true	; DEBUG mode
 
 memorySize equ 500
 lineLength equ 100
@@ -331,8 +331,8 @@ proc handleOneLineCommand
 		jmp finishHandleOneLineCommand
 	
 	handlePlus:
-		;push cx																						plus is temporarly disabled
-		;call plus
+		push cx																					;	plus is temporarly disabled
+		call plus
 		jmp finishHandleOneLineCommand
 	
 	handleShout:					; shout keyword
@@ -580,11 +580,20 @@ proc insertVarToMemory
 		; if the second char is carriage return - insert just the first char
 		cmp ah, 13 ; carriage return
 		jne insert2ValInt
-		mov ah, 30h
+		xchg ah, al
+		mov al, 30h
 		
 		insert2ValInt:
-			sub ah, 30h
+			sub ah, 30h		; get decimal value
 			sub al, 30h
+			mov dx, ax
+			xor ax, ax
+			mov al, dl
+			mov dl, 10
+			mul dl
+			xor dl, dl
+			xchg dh, dl
+			add ax, dx
 			
 			; insert type
 			mov  [byte ptr memoryVariables + di - 1], integer
@@ -841,6 +850,7 @@ endp isDigit
 proc plus
 	push bp
 	mov bp, sp
+	sub sp, 2
 	
 	mov cx, param1		; buffer length
 	dec cx
@@ -860,60 +870,53 @@ proc plus
 	push offset buffer
 	push cx
 	call checkExistsVar
-	
+	mov localVar1, bx
 	; raise error if var doesnt exists
 	cmp dh, 0
 	je errorVarDoesntExistsPlus
 	
 	; get current var value
 	push si
-	call getValue		; dx hold current value
+	call getValue				; dx hold current value
 	
 	; get value from buffer
 	push 2
 	call getValFromBuffer		; ax holds value from buffer
+	cmp ah, 0
+	je addDigit
 	
-	cmp dl, 0
-	jne memLengthOk
-	xchg dh, dl
-	;add dh, 30h
-		
-	memLengthOk:
-	;	sub dh, 30h
-	;	sub dl, 30h
-		
-		cmp ah, 0
-		jne bufferLengthOk
-	;	add ah, 30h
-		
-		bufferLengthOk:
-	;		sub ah, 30h
-	;		sub al, 30h
-			
-			
-			xchg dh, dl
-			add al, dl
-			mov dl, ah
-			xor ah, ah
-			mov bl, 10
-			mul bl
-			add al, dh
-			add al, dl
-			mov dx, ax
-			
-			add dh, 30h
-			add dl, 30h
-			mov ah, 2
-			int 21h
-			xchg dl, dh
-			int 21h
-			
+	; calc addition of var and 2 digits value
+	sub ah, 30h		; get decimal value
+	sub al, 30h
+	xchg ah, al		; add units
+	add dl, al
+	xor al, al
+	xchg ah, al
+	mov cl, 10
+	mul cl		; get value in tens
+	add dl, al	; add tens
+	mov ax, dx
+	jmp update2Digits
+	
+	; calc addition of var and a digit 
+	addDigit:
+		sub al, 30h
+		add dl, al
+		mov ax, dx
+	
+	; updates var
+	update2Digits:
+		mov bx, localVar1		; location of var in memory
+		push ax
+		call updateValProc
+	
 	jmp finishPlus
 	errorVarDoesntExistsPlus:
 		printMsg ErrorVarDoesntExists
 		jmp exit
 	
 	finishPlus:
+		add sp, 2
 		pop bp
 		ret 2
 endp plus
