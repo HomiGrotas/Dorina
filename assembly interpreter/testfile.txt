@@ -1,8 +1,4 @@
 var = 50
-var += 47
+var -= 48
 shout var
-welcome = "hi"
-shout welcome
-welcome = "GG"
-shout welcome
 shout "hello there"
