@@ -1,4 +1,7 @@
-var = 52
-var += 9
+var = 88
+shout var
+var = 5
+shout var
+var += 92
 shout var
 shout "hello there"

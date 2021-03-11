@@ -331,7 +331,7 @@ proc handleOneLineCommand
 		jmp finishHandleOneLineCommand
 	
 	handlePlus:
-		push cx																					;	plus is temporarly disabled
+		push cx
 		call plus
 		jmp finishHandleOneLineCommand
 	
@@ -347,6 +347,39 @@ proc handleOneLineCommand
 		pop bp
 		ret 2
 endp handleOneLineCommand
+
+;--------------------------------------
+; hex to ascii procedure
+; value in ax
+; prints the ascii value
+;--------------------------------------
+proc hexToAscii 
+	push ax bx cx dx si di bp es
+	mov bx, 10	; to divide by 10
+	xor cx, cx
+	
+	loop1:
+		mov dx, 0
+		div bx			; ax /= 10
+		add dl, 30h		; remainder, convert to ascii value
+		push dx			; insert into stack in order to change printing order
+		inc cx			; for the second loop (amount of iterations)
+		cmp ax, 10		; if there is more than 1 digit
+		jge loop1
+	
+	; print digits
+	add al, 30h
+	mov dl, al
+	mov ah, 2		; ah=2, 21h interrupt
+	loop2:
+		int 21h
+		pop dx
+		loop loop2
+	int 21h		; print last digit
+	
+	pop es bp di si dx cx bx ax
+	ret
+endp hexToAscii
 
 
 ;-----------------------------------------
@@ -405,10 +438,21 @@ proc handleShoutKeyword
 		push bx
 		call getValue	 ; value in dx
 		
-		; print value
+		add bx, [bx]
+		mov al, [bx+2]	; type
+		cmp al, integer
+		je printIntVar
+		
+		; print value - str
 		int 21h
 		xchg dl, dh
 		int 21h
+		jmp finishHandleShoutKeyword
+		
+		printIntVar:
+			mov ax, dx
+			call hexToAscii
+
 	
 	jmp finishHandleShoutKeyword
 	varDoesntExists:
@@ -687,6 +731,8 @@ proc assignemtFromBuffer
 	push bp
 	mov bp, sp
 	
+	sub sp, 2
+	
 	push ax
 	push bx
 	push cx
@@ -703,7 +749,8 @@ proc assignemtFromBuffer
 	; check if var already exists
 	push offset buffer
 	push cx  							; var name length
-	call checkExistsVar
+	call checkExistsVar					; var index in bx
+	mov localVar1, bx
 	
 	; check if var exists
 	cmp dh, 1
@@ -715,10 +762,39 @@ proc assignemtFromBuffer
 	jmp finishAssignemtFromBuffer
 	
 	updateVal:
+		; get var value
 		push 1  ; operator length
 		call getValFromBuffer		; ax <- new value
-		push ax
-		call updateValProc			; update the variable value
+		
+		; check var type
+		add bx, [bx]	; skip var name
+		mov bh, [bx+2]  ; get var type
+		cmp bh, string
+		je updateVar
+		
+		; if it's int type -> get decimal from ascii
+		cmp ah, 0	; check if there is only one digit
+		jne TwoDigitsValInt
+		xchg ah, al
+		mov al, 30h
+		
+		TwoDigitsValInt:
+			sub ah, 30h		; get decimal value
+			sub al, 30h
+			mov dx, ax
+			xor ax, ax
+			mov al, dl
+			mov dl, 10
+			mul dl
+			xor dl, dl
+			xchg dh, dl
+			add ax, dx
+			
+			
+		updateVar:
+			mov bx, localVar1
+			push ax
+			call updateValProc			; update the variable value
 
 	
 	finishAssignemtFromBuffer:
@@ -728,6 +804,7 @@ proc assignemtFromBuffer
 		pop bx
 		pop ax
 		
+		add sp, 2
 		pop bp
 		ret 2
 endp assignemtFromBuffer
@@ -844,6 +921,8 @@ endp isDigit
 ;	math operators
 ;--------------------------------------------------------------------------------
 
+
+
 ;--------------------
 ; plus procedure
 
@@ -894,7 +973,7 @@ proc plus
 	xchg ah, al
 	mov cl, 10
 	mul cl		; get value in tens
-	add dl, al	; add tens
+	add dx, ax	; add tens
 	mov ax, dx
 	jmp update2Digits
 	
