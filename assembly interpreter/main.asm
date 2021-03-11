@@ -53,7 +53,7 @@ ErrorMsgCouldntFindOp db 'Error: couldnt find an operator or a keyword...', '$'
 ErrorMsgOpen db 'Error: while opening code file...','$'   ; error message
 ErrorVarDoesntExists db 'Error: var doesnt exists', '$'
 MemoryPrintMsg db '----------------------  MEMORY ----------------------', '$'
-FinishMsg db 'Finished!', '$' ; finished the program
+FinishMsg db 'Finished Succesfuly!', '$' ; finished the program
 
 CODESEG
 
@@ -371,11 +371,14 @@ proc hexToAscii
 	add al, 30h
 	mov dl, al
 	mov ah, 2		; ah=2, 21h interrupt
+	cmp dl, '0'		; if first digit is a zero -> skip
+	je loop2
+	int 21h
+	
 	loop2:
-		int 21h
 		pop dx
+		int 21h		; print last digit
 		loop loop2
-	int 21h		; print last digit
 	
 	pop es bp di si dx cx bx ax
 	ret
@@ -423,11 +426,6 @@ proc handleShoutKeyword
 		add bx, si
 		sub cx, 7
 		
-		test cx, 1
-		jz evenLength
-		dec cx		; due to odd length of shout command, the checkExistsVar procedure will increase the var name length by 1
-		
-		evenLength:
 		push bx		; offset of current var
 		push cx		; var name length
 		call checkExistsVar		; bx now holds the var memory index
@@ -451,7 +449,7 @@ proc handleShoutKeyword
 		
 		printIntVar:
 			mov ax, dx
-			call hexToAscii
+			call hexToAscii		; print var
 
 	
 	jmp finishHandleShoutKeyword
@@ -481,35 +479,18 @@ proc checkExistsVar
 	push bp
 	mov bp, sp
 	
-	
 	push ax
 	push cx
 	push di
-		
+			
 	mov ax, param1 		; var name length
 	
 	mov cx, param2		; var location in buffer
 	xor dh, dh
-
-	lea bx, [memoryVariables]
-	
-	; handle odd buffer length
-	push ax
-	
-	push 1
-	call getValFromBuffer
-	cmp ax, 3031
-	jnb lengthOk
-	
-	
-	pop ax
-	inc ax
-	push ax
-	
-	lengthOk:
-	pop ax
+	;
 	xor si, si	   ; memory index
-	
+	lea bx, [memoryVariables]
+
 	; finish if memory is empty
 	cmp si, [memoryInd]
 	je finishCheckExistsVar  ; memoryInd == 0
@@ -745,12 +726,36 @@ proc assignemtFromBuffer
 		
 	; callInsertion
 	sub cx, 6  							; get length of var (odd length is handled later)
+	mov bx, cx
+	
+	; handle 1 digit value
+	push 1
+	call getValFromBuffer
+	
+	cmp ax, 3031
+	jnb lengthAferValueCheck	; value if more than 1 digit
+	
+	inc bx
+	
+	lengthAferValueCheck:
+		cmp al, '"'
+		jne lengthAfterStrCheck
+		sub bx, 2
+		
+		push 2
+		call getValFromBuffer
+		cmp ah, '"'
+		jne lengthAfterStrCheck
+		inc bx
+	
+	lengthAfterStrCheck:
+	mov cx, bx	   ; ax <- var name length
 	
 	; check if var already exists
 	push offset buffer
 	push cx  							; var name length
 	call checkExistsVar					; var index in bx
-	mov localVar1, bx
+	mov localVar1, bx					; var index
 	
 	; check if var exists
 	cmp dh, 1
@@ -762,15 +767,15 @@ proc assignemtFromBuffer
 	jmp finishAssignemtFromBuffer
 	
 	updateVal:
-		; get var value
-		push 1  ; operator length
-		call getValFromBuffer		; ax <- new value
-		
 		; check var type
 		add bx, [bx]	; skip var name
 		mov bh, [bx+2]  ; get var type
 		cmp bh, string
-		je updateVar
+		je updateStr
+		
+		; get var value
+		push 1  ; operator length
+		call getValFromBuffer		; ax <- new value
 		
 		; if it's int type -> get decimal from ascii
 		cmp ah, 0	; check if there is only one digit
@@ -789,11 +794,18 @@ proc assignemtFromBuffer
 			xor dl, dl
 			xchg dh, dl
 			add ax, dx
-			
+			jmp updateVar		
+		
+		updateStr:	; get var value
+			push 2 ; operator length + "
+			call getValFromBuffer		; ax <- new value
+			cmp ah, '"'					; if the str is 1 digit -> delete msb
+			jne updateVar
+			xor ah, ah
 			
 		updateVar:
-			mov bx, localVar1
-			push ax
+			mov bx, localVar1			; var index
+			push ax						; var new value
 			call updateValProc			; update the variable value
 
 	
@@ -900,23 +912,6 @@ proc getValFromBuffer
 		ret 2
 endp getValFromBuffer
 
-
-; checks whether dl holds a digit
-; return: dh (true/ false)
-proc isDigit
-	xor dh, dh
-	
-	; 30h <= dl <= 39h
-	cmp dl, 30h
-	jb isDigitEnd
-	cmp dl, 39h
-	ja isDigitEnd
-	
-	mov dh, true		; dl holds a digit
-	isDigitEnd:
-		ret
-endp isDigit
-
 ;--------------------------------------------------------------------------------
 ;	math operators
 ;--------------------------------------------------------------------------------
@@ -938,11 +933,11 @@ proc plus
 	push 2
 	call getValFromBuffer
 	cmp ax, 3031
-	jb plusLengthOk
+	jb pluslengthAferValueCheck
 	
 	dec cx ; 1 val
 	
-	plusLengthOk:
+	pluslengthAferValueCheck:
 	sub cx, 5	;  2 space, 2 operator, 1 val
 	
 	; check assigned var exists
@@ -1028,8 +1023,6 @@ start:
 	
 
 exit:
-	newLine
-	newLine
 	newLine
 	newLine
 	printMsg FinishMsg
