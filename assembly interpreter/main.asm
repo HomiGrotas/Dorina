@@ -3,8 +3,6 @@ MODEL small
 STACK 100h
 
 ; ToDO:
-;		string type update
-;		math operators:   +=, -=, *=, /=
 ;		boolean opetatos: >, ==, <, !=
 ;		fix bug of one char var name
 ;		condition
@@ -50,12 +48,14 @@ shoutKeyword db 'shout'
 
 ; messages
 ErrorMsgCouldntFindOp db 'Error: couldnt find an operator or a keyword...', '$'
-ErrorMsgOpen db 'Error: while opening code file...','$'   ; error message
-ErrorVarDoesntExists db 'Error: var doesnt exists', '$'
+ErrorMsgOpen db 'Error: while opening code file...','$'   ; error messages
+ErrorVarDoesntExists db "Error: var doesn't exists", '$'
+ErrorDivideByZero db "Error: can't divide by zero", '$'
 MemoryPrintMsg db '----------------------  MEMORY ----------------------', '$'
 FinishMsg db 'Finished Succesfuly!', '$' ; finished the program
 
 CODESEG
+jumps		; support far jumps
 
 
 ;------------------------------------------------------------------------------------------------------
@@ -215,7 +215,6 @@ proc OpenFile
 	openerror :
 		printMsg ErrorMsgOpen
 		jmp exit
-	ret
 endp OpenFile
 
 
@@ -320,6 +319,15 @@ proc handleOneLineCommand
 		cmp dx, '*='
 		je handleMultiply
 		
+		cmp dx, '/='
+		je handleDivide
+		
+		cmp dx, '%='
+		je handleMudolo
+		
+		cmp dx, '^='
+		je handlePower
+		
 		; check if shout keyword is used
 		push offset shoutKeyword
 		push offset buffer
@@ -338,19 +346,41 @@ proc handleOneLineCommand
 	
 	handlePlus:						; += operator
 		push cx						; buffer length
-		call plus
+		push '+='
+		call mathOperator
 		jmp finishHandleOneLineCommand
 		
 	handleMinus:					; -= operator
 		push cx						; buffer length
-		call minus
+		push '-='
+		call mathOperator
 		jmp finishHandleOneLineCommand
 	
 	handleMultiply:					; *= operator
 		push cx						; buffer length
-		call multiply				
+		push '*='
+		call mathOperator				
 		jmp finishHandleOneLineCommand
 		
+	handleDivide:					; /= operator
+		push cx						; buffer length
+		push '/='
+		call mathOperator				
+		jmp finishHandleOneLineCommand
+		
+		
+	handleMudolo:					; %= operator
+		push cx						; buffer length
+		push '%='
+		call mathOperator				
+		jmp finishHandleOneLineCommand
+	
+	handlePower:					; ^= operator
+		push cx						; buffer length
+		push '^='
+		call mathOperator				
+		jmp finishHandleOneLineCommand
+	
 	handleShout:					; shout keyword
 		push cx						; buffer length
 		call handleShoutKeyword
@@ -935,36 +965,37 @@ endp getValFromBuffer
 
 
 ;--------------------
-; plus procedure
-
-proc plus
+; math operator procedure
+; handles all the math operators
+; params: buffer length, operator type
+proc mathOperator
 	push bp
 	mov bp, sp
 	sub sp, 2
 	
-	mov cx, param1		; buffer length
+	mov cx, param2		; buffer length
 	dec cx
 	
 	; check var length (buffer length - value length - 2 space, 2 operator)
 	push 2
 	call getValFromBuffer
 	cmp ax, 3031
-	jb pluslengthAferValueCheck
+	jb lengthAferValueCheckOPerator
 	
 	dec cx ; 1 val
 	
-	pluslengthAferValueCheck:
+	lengthAferValueCheckOPerator:
 		sub cx, 5	;  2 space, 2 operator, 1 val
 		
 		; check assigned var exists
 		push offset buffer
 		push cx
 		call checkExistsVar
-		mov localVar1, bx
+		
 		; raise error if var doesnt exists
 		cmp dh, 0
-		je errorVarDoesntExistsPlus
-		
+		je errorVarDoesntExistsOperator
+				
 		; get current var value
 		push si
 		call getValue				; dx hold current value
@@ -972,194 +1003,123 @@ proc plus
 		; get value from buffer
 		push 2
 		call getValFromBuffer		; ax holds value from buffer
-		cmp ah, 0
-		je addDigit
 		
-		; calc addition of var and 2 digits value
-		sub ah, 30h		; get decimal value
-		sub al, 30h
-		xchg ah, al		; add units
-		add dl, al
-		xor al, al
-		xchg ah, al
-		mov cl, 10
-		mul cl		; get value in tens
-		add dx, ax	; add tens
-		mov ax, dx
-		jmp add2Digits
+		call bufferNumToRealNum		; ax holds hex value
+		mov cx, param1				; operator
+
+		cmp cx, '+='
+		je plus
 		
-		; calc addition of var and a digit 
-		addDigit:
-			sub al, 30h
-			add dl, al
+		cmp cx, '-='
+		je minus
+		
+		cmp cx, '*='
+		je multiply
+		
+		cmp cx, '/='
+		je divide
+		
+		cmp cx, '%='
+		je modulo
+		
+		cmp cx, '^='
+		je power
+		
+		plus:
+			add ax, dx
+			jmp updateVarOperator
+		
+		minus:
+			sub dx, ax
 			mov ax, dx
+			jmp updateVarOperator
 		
-		; updates var
-		add2Digits:
-			mov bx, localVar1		; location of var in memory
+		multiply:
+			mul dx
+			jmp updateVarOperator
+
+		divide:
+			cmp ax, 0
+			je errorDivideByZeroOperator
+			
+			xchg ax, dx
+			mov cx, dx
+			xor dx, dx
+			div cx
+			jmp updateVarOperator
+
+		modulo:
+			cmp ax, 0
+			je errorDivideByZeroOperator
+			
+			xchg ax, dx
+			mov cx, dx
+			xor dx, dx
+			div cx
+			mov ax, dx	; remainder after divide
+			jmp updateVarOperator
+			
+		power:
+			push bx
+			mov cx, ax		; mul amount
+			mov ax, 1		; start value
+			mov bx, dx		; mul value
+			xor dx, dx
+			mulLoop:
+				mul bx
+				loop mulLoop
+			pop bx
+			
+		updateVarOperator:
+			; updates var
 			push ax
 			call updateValProc
 		
-		jmp finishPlus
-		errorVarDoesntExistsPlus:
+		jmp finishMathOperator
+		errorDivideByZeroOperator:
+			printMsg ErrorDivideByZero
+			jmp exit
+			
+		errorVarDoesntExistsOperator:
 			printMsg ErrorVarDoesntExists
 			jmp exit
 		
-		finishPlus:
+		finishMathOperator:
 			add sp, 2
 			pop bp
-			ret 2
-endp plus
+			ret 4
+endp mathOperator
 
 
-;--------------------
-; minus procedure
-proc minus
-	push bp
-	mov bp, sp
-	sub sp, 2
+; param: ax
+; does converts 1/2 digits into a number. For example: 30 32 -> 20, 35 00 -> 5
+proc bufferNumToRealNum
+	push bx
+	push dx
 	
-	mov cx, param1		; buffer length
-	dec cx
+	mov bl, 10	; multiply for tens
+	cmp ah, 0
+	jne twoDigit
 	
-	; check var length (buffer length - value length - 2 space, 2 operator)
-	push 2
-	call getValFromBuffer
-	cmp ax, 3031
-	jb minusLengthAferValueCheck
+	sub al, 30h
 	
-	dec cx ; 1 val
-	minusLengthAferValueCheck:
-		sub cx, 5	;  2 space, 2 operator, 1 val
-		
-		; check assigned var exists
-		push offset buffer
-		push cx
-		call checkExistsVar
-		mov localVar1, bx
-		; raise error if var doesnt exists
-		cmp dh, 0
-		je errorVarDoesntExistsMinus
-		
-		; get current var value
-		push si
-		call getValue				; dx hold current value
-		
-		; get value from buffer
-		push 2
-		call getValFromBuffer		; ax holds value from buffer
-		cmp ah, 0
-		je subDigit
-		
-		; calc addition of var and 2 digits value
-		sub ah, 30h		; get decimal value
-		sub al, 30h
-		xchg ah, al		; sub units
-		sub dl, al
-		xor al, al
+	
+	jmp finishBufferNumToRealNum
+	twoDigit:
 		xchg ah, al
-		mov cl, 10
-		mul cl		; get value in tens
-		sub dx, ax	; sub tens
-		mov ax, dx
-		jmp sub2Digits
-		
-		; calc addition of var and a digit 
-		subDigit:
-			sub al, 30h
-			sub dl, al
-			mov ax, dx
-		
-		; updates var
-		sub2Digits:
-			mov bx, localVar1		; location of var in memory
-			push ax
-			call updateValProc
-		
-	jmp finishPlus
-	errorVarDoesntExistsMinus:
-		printMsg ErrorVarDoesntExists
-		jmp exit
-	
-	finishMinus:
-		add sp, 2
-		pop bp
-		ret 2
-endp minus
-
-
-;--------------------
-; multiply
-proc multiply
-		push bp
-	mov bp, sp
-	sub sp, 2
-	
-	mov cx, param1		; buffer length
-	dec cx
-		
-	; check var length (buffer length - value length - 2 space, 2 operator)
-	push 2
-	call getValFromBuffer
-	cmp ax, 3031
-	jb mulLengthAferValueCheck
-	
-	dec cx ; 1 val
-	mulLengthAferValueCheck:
-		sub cx, 5	;  2 space, 2 operator, 1 val
-		
-		; check assigned var exists
-		push offset buffer
-		push cx
-		call checkExistsVar
-		mov localVar1, bx
-		; raise error if var doesnt exists
-		cmp dh, 0
-		je errorVarDoesntExistsMul
-		
-		; get current var value
-		push si
-		call getValue				; dx hold current value
-		
-		; get value from buffer
-		push 2
-		call getValFromBuffer		; ax holds value from buffer
-		cmp ax, 40h
-		jb mulDigit
-		
-		; calc addition of var and 2 digits value
-		sub ah, 30h		; get decimal value
+		sub ah, 30h		; get decimal digits
 		sub al, 30h
-		mov bl, 10
-		mov cx, ax 		; cx holds value from buffer
+		mov dl, al
+		mov al, ah
 		xor ah, ah
-		mul bl
-		add al, ch
-		
-		mul dx
-		jmp mul2Digits
-		
-		; calc addition of var and a digit 
-		mulDigit:
-			sub al, 30h
-			mul dx
-		
-		; updates var
-		mul2Digits:
-			mov bx, localVar1		; location of var in memory
-			push ax
-			call updateValProc
-		
-	jmp finishPlus
-	errorVarDoesntExistsMul:
-		printMsg ErrorVarDoesntExists
-		jmp exit
+		mul bl			; mul to get tens
+		add al, dl		; add units
 	
-	finishMul:
-		add sp, 2
-		pop bp
-		ret 2
-endp multiply
+	finishBufferNumToRealNum:
+		pop dx
+		pop bx
+		ret
+endp bufferNumToRealNum
 
 ;----------------
 ; START
@@ -1187,11 +1147,10 @@ start:
 	push offset memoryVariables
 	call printArray
 	
-
-exit:
 	newLine
 	newLine
 	printMsg FinishMsg
+exit:
 	mov ax, 4c00h
 	int 21h
 	END start

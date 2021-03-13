@@ -1,4 +1,4 @@
-var = 12
-var *= 20
+var = 50
+var ^= 2
 shout var
 shout "hello there"
