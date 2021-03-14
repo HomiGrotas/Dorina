@@ -1,4 +1,3 @@
-var = 50
-var ^= 2
-shout var
-shout "hello there"
+x = 9
+x ^= 99
+shout x

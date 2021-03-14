@@ -15,7 +15,7 @@ DATASEG
 ; constants
 false  equ 0
 true   equ 1
-DEBUG  equ true	; DEBUG mode
+DEBUG  equ false	; DEBUG mode
 
 memorySize equ 500
 lineLength equ 100
@@ -151,6 +151,15 @@ proc cmpStrings
 	
 	mov si, param2 ; offset for first name
 	mov bx, param3 ; offset for second name
+	
+	cmp cx, 0			; if it's just one char -> cmp just byte
+	jne cmpLoop
+	
+	mov ah, [bx]
+	mov dh, [si]
+	cmp dh, ah
+	je equals
+	jmp notEq
 	
 	; loop through the two names (checks in pairs for effiecenty)
 	cmpLoop:
@@ -313,6 +322,7 @@ proc handleOneLineCommand
 		cmp dx, '+='
 		je handlePlus
 		
+				; check if operator is '+='
 		cmp dx, '-='
 		je handleMinus
 		
