@@ -4,10 +4,20 @@ This is the final project of my assembly learning.
 
 
 
+
+
+
 ## Stages:
 - [x] design the language
 - [x] build a python interpeter
 - [ ] build an assembly interpeter based on the python version
+
+
+
+
+
+
+
 
 
 
@@ -18,9 +28,15 @@ This is the final project of my assembly learning.
  
  
  
+ 
+ 
+ 
+ 
+ 
+ 
+ 
  # documentation
- 
- 
+
  ## Variables Decleration
  ### Integers
 ```
@@ -35,6 +51,8 @@ hello = "hi"
 me = "I"
 ```
 
+
+
 ## Display variables
 ```
 shout x
@@ -42,10 +60,19 @@ shout myAge
 ```
 
 
+
+
+
+
 ## Display text
 ```
 shout "Hello World!"
 ```
+
+
+
+
+
 
 
 ## Math Operators
