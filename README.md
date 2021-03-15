@@ -22,11 +22,18 @@ This is the final project of my assembly learning.
  
  
  ## Variables Decleration
+ ### Integers
 ```
 x = 5
 myAge = 16
 ```
 
+
+### Strings
+```
+hello = "hi"
+me = "I"
+```
 
 ## Display variables
 ```
