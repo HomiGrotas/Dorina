@@ -5,9 +5,9 @@ This is the final project of my assembly learning.
 
 
 ## Stages:
-[x] design the language
-[x] build a python interpeter
-build an assembly interpeter based on the python version
+- [x] design the language
+- [x] build a python interpeter
+- [] build an assembly interpeter based on the python version
 
 
 
