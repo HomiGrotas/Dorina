@@ -3,12 +3,10 @@ MODEL small
 STACK 100h
 
 ; ToDO:
-;		boolean opetatos: >, ==, <, !=
-;		fix bug of one char var name
 ;		condition
 ;		while loop
 
-; HowTo: get var name: insert var length, insert to stack 2 by 2  mem:[length, name, type, value, length, name, type, value...]
+; HowTo:  mem:[length (word), name (unlinited), type (int/str), value (word), length, name, type, value...]
 
 DATASEG
 
@@ -53,6 +51,8 @@ ErrorVarDoesntExists db "Error: var doesn't exists", '$'
 ErrorDivideByZero db "Error: can't divide by zero", '$'
 MemoryPrintMsg db '----------------------  MEMORY ----------------------', '$'
 FinishMsg db 'Finished Succesfuly!', '$' ; finished the program
+TrueMsg db 'True', '$'
+FalseMsg db 'False', '$'
 
 CODESEG
 jumps		; support far jumps
@@ -314,6 +314,9 @@ proc handleOneLineCommand
 		push cx
 		call findOp
 		
+		;---------------------
+		; math operators check:
+		
 		; check if operator is '='
 		cmp dx, '='
 		je handleAssignment
@@ -322,21 +325,45 @@ proc handleOneLineCommand
 		cmp dx, '+='
 		je handlePlus
 		
-				; check if operator is '+='
+		; check if operator is '-='
 		cmp dx, '-='
 		je handleMinus
 		
+		; check if operator is '*='
 		cmp dx, '*='
 		je handleMultiply
 		
+		; check if operator is '/='
 		cmp dx, '/='
 		je handleDivide
 		
+		; check if operator is '%='
 		cmp dx, '%='
 		je handleMudolo
 		
+		; check if operator is '^='
 		cmp dx, '^='
 		je handlePower
+		
+		;---------------------
+		; boolean operators check:
+		cmp dx, '<'
+		je handleSmaller
+		
+		cmp dx, '>'
+		je handleGreater
+		
+		cmp dx, '=='
+		je handleEquals
+		
+		cmp dx, '!='
+		je handleNEquals
+		
+		cmp dx, '<='
+		je handleSmallerE
+		
+		cmp dx, '>='
+		je handleBiggerE
 		
 		; check if shout keyword is used
 		push offset shoutKeyword
@@ -345,6 +372,7 @@ proc handleOneLineCommand
 		call cmpStrings
 		cmp dh, true
 		je handleShout
+		
 		
 		printMsg ErrorMsgCouldntFindOp
 		jmp exit
@@ -357,43 +385,82 @@ proc handleOneLineCommand
 	handlePlus:						; += operator
 		push cx						; buffer length
 		push '+='
-		call mathOperator
+		call mathOperators
 		jmp finishHandleOneLineCommand
 		
 	handleMinus:					; -= operator
 		push cx						; buffer length
 		push '-='
-		call mathOperator
+		call mathOperators
 		jmp finishHandleOneLineCommand
 	
 	handleMultiply:					; *= operator
 		push cx						; buffer length
 		push '*='
-		call mathOperator				
+		call mathOperators				
 		jmp finishHandleOneLineCommand
 		
 	handleDivide:					; /= operator
 		push cx						; buffer length
 		push '/='
-		call mathOperator				
+		call mathOperators				
 		jmp finishHandleOneLineCommand
 		
 		
 	handleMudolo:					; %= operator
 		push cx						; buffer length
 		push '%='
-		call mathOperator				
+		call mathOperators				
 		jmp finishHandleOneLineCommand
 	
 	handlePower:					; ^= operator
 		push cx						; buffer length
 		push '^='
-		call mathOperator				
+		call mathOperators				
 		jmp finishHandleOneLineCommand
+	
+	
+	handleSmaller:					; < operator
+		push cx						; buffer length
+		push '<'
+		call booleanOperators
+		jmp finishHandleOneLineCommand
+		
+	handleGreater:					; > operator
+		push cx						; buffer length
+		push '>'
+		call booleanOperators
+		jmp finishHandleOneLineCommand
+		
+	handleEquals:					; == operator
+		push cx						; buffer length
+		push '=='
+		call booleanOperators
+		jmp finishHandleOneLineCommand
+		
+	handleNEquals:					; != operator
+		push cx						; buffer length
+		push '!='
+		call booleanOperators
+		jmp finishHandleOneLineCommand
+		
+	handleSmallerE:					; <= operator
+		push cx						; buffer length
+		push '<='
+		call booleanOperators
+		jmp finishHandleOneLineCommand
+		
+	handleBiggerE:					; >= operator
+		push cx						; buffer length
+		push '>='
+		call booleanOperators
+		jmp finishHandleOneLineCommand
+	
 	
 	handleShout:					; shout keyword
 		push cx						; buffer length
 		call handleShoutKeyword
+		jmp finishHandleOneLineCommand
 		
 	finishHandleOneLineCommand:
 		pop cx
@@ -411,7 +478,7 @@ endp handleOneLineCommand
 ;--------------------------------------
 proc hexToAscii 
 	push ax bx cx dx si di bp es
-	mov bx, 10	; to divide by 10
+	mov bx, 10			; to divide by 10
 	xor cx, cx
 	
 	loop1:
@@ -523,7 +590,6 @@ proc handleShoutKeyword
 		pop bp
 		ret 2
 endp handleShoutKeyword
-
 
 ;-------------------------------------------
 ; checkExistsVar procedure
@@ -659,7 +725,7 @@ proc insertVarToMemory
 		mov ah, [buffer + si + 4]
 		
 		; if the second char is carriage return - insert just the first char
-		cmp ah, 13 ; carriage return
+		cmp ah, 13 				; carriage return
 		jne insert2ValInt
 		xchg ah, al
 		mov al, 30h
@@ -698,8 +764,8 @@ proc insertVarToMemory
 				mov  [memoryVariables + di], ax
 	
 	finishInserting:
-		add [memoryInd], si	; length of name
-		add [memoryInd], 5	;  2length, 2value, 1type, 1next location
+		add [memoryInd], si		; length of name
+		add [memoryInd], 5		;  2length, 2value, 1type, 1next location
 		
 		add sp, 2
 		
@@ -711,7 +777,6 @@ proc insertVarToMemory
 		pop bp
 		ret 
 endp insertVarToMemory
-
 
 
 ;----------------------------------
@@ -781,7 +846,7 @@ proc assignemtFromBuffer
 	xor si, si
 		
 	; callInsertion
-	sub cx, 6  							; get length of var (odd length is handled later)
+	sub cx, 6  					; get length of var (odd length is handled later)
 	mov bx, cx
 	
 	; handle 1 digit value
@@ -824,23 +889,23 @@ proc assignemtFromBuffer
 	
 	updateVal:
 		; check var type
-		add bx, [bx]	; skip var name
-		mov bh, [bx+2]  ; get var type
+		add bx, [bx]				; skip var name
+		mov bh, [bx+2]  			; get var type
 		cmp bh, string
 		je updateStr
 		
 		; get var value
 		push 1  ; operator length
-		call getValFromBuffer		; ax <- new value
+		call getValFromBuffer			; ax <- new value
 		
 		; if it's int type -> get decimal from ascii
-		cmp ah, 0	; check if there is only one digit
+		cmp ah, 0						; check if there is only one digit
 		jne TwoDigitsValInt
 		xchg ah, al
 		mov al, 30h
 		
 		TwoDigitsValInt:
-			sub ah, 30h		; get decimal value
+			sub ah, 30h					; get decimal value
 			sub al, 30h
 			mov dx, ax
 			xor ax, ax
@@ -853,7 +918,7 @@ proc assignemtFromBuffer
 			jmp updateVar		
 		
 		updateStr:	; get var value
-			push 2 ; operator length + "
+			push 2 						; operator length + "
 			call getValFromBuffer		; ax <- new value
 			cmp ah, '"'					; if the str is 1 digit -> delete msb
 			jne updateVar
@@ -895,7 +960,7 @@ proc getValue
 	add bx, param1
 	
 	; skip var name
-	add bx, [bx] ; bx += var name length
+	add bx, [bx] 		; bx += var name length
 	mov dx, [bx + 3]	; skip type 1, var name length 2
 		
 	pop bx
@@ -911,13 +976,13 @@ proc updateValProc
 	push bp
 	mov bp, sp
 	
-	mov dx, param1		; new value
+	mov dx, param1			; new value
 	
 	; skip var name
-	add bx, [bx] ; bx += var name length
+	add bx, [bx] 			; bx += var name length
 	
 	; update value
-	mov [bx + 3], dx  ; skip type and move to val area
+	mov [bx + 3], dx  		; skip type and move to val area
 	
 	pop bp
 	ret 2
@@ -939,23 +1004,23 @@ proc getValFromBuffer
 	push dx
 	push di
 	
-	mov bx, param1	; operator length
+	mov bx, param1						; operator length
 	
-	xor si, si				; buffer index
+	xor si, si							; buffer index
 	loopBuffer:
 		mov ah, [buffer + si]
 		inc si
-		cmp ah, ' '									; stop looping if reached a space (' ')
+		cmp ah, ' '						; stop looping if reached a space (' ')
 		je finishedLoopingNameBuffer
-		jmp loopBuffer		; keep looping
+		jmp loopBuffer					; keep looping
 	
 	finishedLoopingNameBuffer:
-		add si, bx		; add operator length
+		add si, bx						; add operator length
 		mov al, [buffer + si + 1]		; get value
 		mov ah, [buffer + si + 2]
 	
 	; if the second char is carriage return - insert just the first char
-	cmp ah, 13 					; carriage return
+	cmp ah, 13 							; carriage return
 	jne finishLoopingBuffer
 	xor ah, ah
 	
@@ -968,34 +1033,41 @@ proc getValFromBuffer
 		ret 2
 endp getValFromBuffer
 
+
+
 ;--------------------------------------------------------------------------------
-;	math operators
+; Operators
 ;--------------------------------------------------------------------------------
 
 
-
-;--------------------
+;---------------------------------------------------------
 ; math operator procedure
 ; handles all the math operators
-; params: buffer length, operator type
-proc mathOperator
+; params: buffer length, operator
+;---------------------------------------------------------
+proc mathOperators
 	push bp
 	mov bp, sp
 	sub sp, 2
 	
+	push ax
+	push bx
+	push cx
+	push dx
+	
 	mov cx, param2		; buffer length
-	dec cx
+	dec cx				; remove CR (carriage return)
 	
 	; check var length (buffer length - value length - 2 space, 2 operator)
 	push 2
 	call getValFromBuffer
 	cmp ax, 3031
-	jb lengthAferValueCheckOPerator
+	jb lengthAferValueCheckOperator
 	
 	dec cx ; 1 val
 	
-	lengthAferValueCheckOPerator:
-		sub cx, 5	;  2 space, 2 operator, 1 val
+	lengthAferValueCheckOperator:
+		sub cx, 5					;  2 space, 2 operator, 1 val
 		
 		; check assigned var exists
 		push offset buffer
@@ -1066,26 +1138,28 @@ proc mathOperator
 			mov cx, dx
 			xor dx, dx
 			div cx
-			mov ax, dx	; remainder after divide
+			mov ax, dx		; remainder after divide
 			jmp updateVarOperator
 			
 		power:
-			push bx
+			push bx			; save bx
 			mov cx, ax		; mul amount
 			mov ax, 1		; start value
 			mov bx, dx		; mul value
 			xor dx, dx
+			
 			mulLoop:
 				mul bx
 				loop mulLoop
-			pop bx
-			
+			pop bx			; restore bx
+			jmp updateVarOperator
+						
 		updateVarOperator:
 			; updates var
 			push ax
 			call updateValProc
 		
-		jmp finishMathOperator
+		jmp finishMathOperators
 		errorDivideByZeroOperator:
 			printMsg ErrorDivideByZero
 			jmp exit
@@ -1094,20 +1168,142 @@ proc mathOperator
 			printMsg ErrorVarDoesntExists
 			jmp exit
 		
-		finishMathOperator:
+		finishMathOperators:
+			pop dx
+			pop cx
+			pop bx
+			pop ax
+		
 			add sp, 2
 			pop bp
 			ret 4
-endp mathOperator
+endp mathOperators
 
 
+;----------------------------------------
+; boolean operators
+; <, >, ==, !=, <=, >=
+; params: buffer length, operator
+; returns: dh (true/ false)
+;----------------------------------------
+proc booleanOperators
+	push bp
+	mov bp, sp
+	sub sp, 2
+	
+	push ax
+	push bx
+	push cx
+	
+	mov cx, param2		; buffer length
+	dec cx				; remove CR (carriage return)
+	
+	; check var length (buffer length - value length - 2 space, 2 operator)
+	push 2
+	call getValFromBuffer
+	cmp ax, 3031
+	jb lengthAferValueCheckBoolOperator
+	
+	dec cx ; 1 val
+	
+	lengthAferValueCheckBoolOperator:
+		sub cx, 5					;  2 space, 2 operator, 1 val
+		
+		; check assigned var exists
+		push offset buffer
+		push cx
+		call checkExistsVar
+		
+		; raise error if var doesnt exists
+		cmp dh, 0
+		je errorVarDoesntExistsOperator
+				
+		; get current var value
+		push si
+		call getValue				; dx hold current value
+		mov bx, dx					; bx hold current value (dh is the return value)
+		
+		; get value from buffer
+		push 2
+		call getValFromBuffer		; ax holds value from buffer
+		
+		call bufferNumToRealNum		; ax holds hex value
+		mov cx, param1				; operator
+		xor dh, dh					; default status (false)
+		
+		cmp cx, '<'
+		je smaller
+		
+		cmp cx, '>'
+		je greater
+		
+		cmp cx, '=='
+		je equalsOp
+		
+		cmp cx, '!='
+		je nEquals
+		
+		cmp cx, '<='
+		je smallerE
+		
+		cmp cx, '>='
+		je biggerE
+		
+		smaller:
+			cmp bx, ax
+			jb trueCondition
+			jmp finishBooleanOperators
+			
+		greater:
+			cmp bx, ax
+			ja trueCondition
+			jmp finishBooleanOperators
+			
+		equalsOp:
+			cmp bx, ax
+			je trueCondition
+			jmp finishBooleanOperators
+		
+		nEquals:
+			cmp bx, ax
+			jne trueCondition
+			jmp finishBooleanOperators
+		
+		smallerE:
+			cmp bx, ax
+			jbe trueCondition
+			jmp finishBooleanOperators
+		
+		biggerE:
+			cmp bx, ax
+			jae trueCondition
+			jmp finishBooleanOperators
+		
+	jmp finishBooleanOperators
+	trueCondition:
+		mov dh, true
+
+	finishBooleanOperators:
+		pop cx
+		pop bx
+		pop ax
+		
+		add sp, 2
+		pop bp
+		ret 4
+endp booleanOperators
+
+
+;--------------------------------------------------------------------
+; buffer to real num procedure
 ; param: ax
-; does converts 1/2 digits into a number. For example: 30 32 -> 20, 35 00 -> 5
+; does: converts 1/2 digits into a number. For example: 30 32 -> 20, 35 00 -> 5
+;--------------------------------------------------------------------
 proc bufferNumToRealNum
 	push bx
 	push dx
 	
-	mov bl, 10	; multiply for tens
+	mov bl, 10			; multiply for tens
 	cmp ah, 0
 	jne twoDigit
 	
