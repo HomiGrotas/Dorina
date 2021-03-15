@@ -1,14 +1,42 @@
 # Dorina programming language
-Programming language with assembly interpeter
+Simple programming language with assembly interpeter and python interpeter.
 This is the final project of my assembly learning.
 
-Stages:
+## Stages:
 * design the language - Done
 * build a python interpeter - Done
 * build an assembly interpeter based on the python version
 
-Goal:
- The goal of this project is to build an assembly interpreter for the programming language I made (Dorina)
+## Goal:
+ The goal of this project is to build an assembly interpreter for the programming language I made (Dorina).
+ This project is for my Magen grade.
+ 
+ # documentation
+ 
+ ## Variables Decleration
+```
+x = 5
+myAge = 16
+```
 
-Project flow chart:
-https://drive.google.com/file/d/1Twak5Kbbyx_2l4p3Aswlt9o0TnzG-XwW/view?usp=sharing
+## Display variables
+```
+shout x
+shout myAge
+```
+
+## Display text
+```
+shout "Hello World!"
+```
+
+## Math Operators
+```
+x += 1
+x -= 1
+x *= 1
+x /= 1
+x ^= 1
+```
+
+coming soon: conditions, while loop
