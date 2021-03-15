@@ -11,7 +11,10 @@ This is the final project of my assembly learning.
  The goal of this project is to build an assembly interpreter for the programming language I made (Dorina).
  This project is for my Magen grade.
  
+ 
+ 
  # documentation
+ 
  
  ## Variables Decleration
 ```
@@ -19,16 +22,19 @@ x = 5
 myAge = 16
 ```
 
+
 ## Display variables
 ```
 shout x
 shout myAge
 ```
 
+
 ## Display text
 ```
 shout "Hello World!"
 ```
+
 
 ## Math Operators
 ```
