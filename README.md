@@ -2,10 +2,15 @@
 Simple programming language with assembly interpeter and python interpeter.
 This is the final project of my assembly learning.
 
+
+
 ## Stages:
-* design the language - Done
-* build a python interpeter - Done
-* build an assembly interpeter based on the python version
+[x] design the language
+[x] build a python interpeter
+build an assembly interpeter based on the python version
+
+
+
 
 ## Goal:
  The goal of this project is to build an assembly interpreter for the programming language I made (Dorina).
