@@ -84,4 +84,20 @@ x /= 1
 x ^= 1
 ```
 
-coming soon: conditions, while loop
+## If statement
+```
+x = 0
+if x < 10
+shout "x is smaller than 10"
+endif
+```
+
+```
+x = 5
+if x != 5
+shout x
+endif
+```
+
+
+coming soon: while loop
