@@ -35,7 +35,7 @@ This is the final project of my assembly learning.
  
  
  
- # documentation
+ # Documentation
 
  ## Variables Decleration
  ### Integers
