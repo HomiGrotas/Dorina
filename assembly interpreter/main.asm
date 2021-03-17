@@ -3,7 +3,7 @@ MODEL small
 STACK 100h
 
 ; ToDO:
-;		condition
+;		condition 1 digit operator
 ;		while loop
 
 ; HowTo:  mem:[length (word), name (unlinited), type (int/str), value (word), length, name, type, value...]
@@ -13,7 +13,7 @@ DATASEG
 ; constants
 false  equ 0
 true   equ 1
-DEBUG  equ false	; DEBUG mode
+DEBUG  equ false			; DEBUG mode
 
 memorySize equ 500
 lineLength equ 100
@@ -30,19 +30,23 @@ string equ 1
 boolean equ 2
 
 
-memoryVariables dw memorySize dup('*')     ; buffer array - stores the data from the file
-memoryInd dw 0 ; can be up to 65,535
+memoryVariables dw memorySize dup('*')     				  ; buffer array - stores the data from the file
+memoryInd dw 0											  ; can be up to 65,535
 
 ; variables for file opening
-filename db 'testfile.txt',0	  ; file to operate on
+filename db 'testfile.txt',0	  	  ; file to operate on
 filehandle dw '.'					  ; file handle
 
 ; variables for reading the file
-buffer db lineLength dup('#')
-char db '&'
+buffer db lineLength dup('#')				; buffer (line)
+char db ?								 	; char from file 
 
 ; keywords
 shoutKeyword db 'shout'
+ifKeyword db 'if'
+endIfKeyword db 'endif'
+inIf db false
+execIf db false
 
 ; messages
 ErrorMsgCouldntFindOp db 'Error: couldnt find an operator or a keyword...', '$'
@@ -311,8 +315,26 @@ proc handleOneLineCommand
 	newLine
 	
 	cmpOp:
+		; endif keyword
+		push offset endIfKeyword
+		push offset buffer
+		push 5
+		call cmpStrings
+		
+		cmp dh, true
+		je endIfLbl
+		
+		; if in if statement and it's false -> don't execute
+		cmp [inIf], false
+		je checkOp
+		cmp [execIf], false
+		je finishHandleOneLineCommand
+		
+		; search for operator / keyword
+		checkOp:
+		push offset buffer
 		push cx
-		call findOp
+		call findOp		; dx <- operator
 		
 		;---------------------
 		; math operators check:
@@ -345,31 +367,21 @@ proc handleOneLineCommand
 		cmp dx, '^='
 		je handlePower
 		
-		;---------------------
-		; boolean operators check:
-		cmp dx, '<'
-		je handleSmaller
+		; 'if' keyword
+		push offset ifKeyword
+		push offset buffer
+		push 2
+		call cmpStrings
 		
-		cmp dx, '>'
-		je handleGreater
-		
-		cmp dx, '=='
-		je handleEquals
-		
-		cmp dx, '!='
-		je handleNEquals
-		
-		cmp dx, '<='
-		je handleSmallerE
-		
-		cmp dx, '>='
-		je handleBiggerE
+		cmp dh, true
+		je startIf
 		
 		; check if shout keyword is used
 		push offset shoutKeyword
 		push offset buffer
 		push 5
 		call cmpStrings
+		
 		cmp dh, true
 		je handleShout
 		
@@ -419,43 +431,87 @@ proc handleOneLineCommand
 		call mathOperators				
 		jmp finishHandleOneLineCommand
 	
-	
-	handleSmaller:					; < operator
-		push cx						; buffer length
-		push '<'
-		call booleanOperators
-		jmp finishHandleOneLineCommand
+	; handle if keyword
+	startIf:
+		mov [inIf], true
+		lea bx, [buffer]
+		add bx, 3	; 2 if, 1 space
+		sub cx, 3	; 2 if, 1 space
 		
-	handleGreater:					; > operator
-		push cx						; buffer length
-		push '>'
-		call booleanOperators
-		jmp finishHandleOneLineCommand
+		push bx		; array offset
+		push cx		; array length
+		call findOp		; dx <- operator
 		
-	handleEquals:					; == operator
-		push cx						; buffer length
-		push '=='
-		call booleanOperators
-		jmp finishHandleOneLineCommand
+		;---------------------
+		; boolean operators check:
+		cmp dx, '<'
+		je handleSmaller
 		
-	handleNEquals:					; != operator
-		push cx						; buffer length
-		push '!='
-		call booleanOperators
-		jmp finishHandleOneLineCommand
+		cmp dx, '>'
+		je handleGreater
 		
-	handleSmallerE:					; <= operator
-		push cx						; buffer length
-		push '<='
-		call booleanOperators
-		jmp finishHandleOneLineCommand
+		cmp dx, '=='
+		je handleEquals
 		
-	handleBiggerE:					; >= operator
-		push cx						; buffer length
-		push '>='
-		call booleanOperators
+		cmp dx, '!='
+		je handleNEquals
+		
+		cmp dx, '<='
+		je handleSmallerE
+		
+		cmp dx, '>='
+		je handleBiggerE
+		
+		
+		handleSmaller:					; < operator
+			push bx
+			push cx						; buffer length
+			push '<'
+			call booleanOperators
+			jmp checkTrueCondition
+			
+		handleGreater:					; > operator
+			push bx
+			push cx						; buffer length
+			push '>'
+			call booleanOperators
+			jmp checkTrueCondition
+			
+		handleEquals:					; == operator
+			push bx
+			push cx						; buffer length
+			push '=='
+			call booleanOperators
+			jmp checkTrueCondition
+			
+		handleNEquals:					; != operator
+			push bx
+			push cx						; buffer length
+			push '!='
+			call booleanOperators
+			jmp checkTrueCondition
+			
+		handleSmallerE:					; <= operator
+			push bx
+			push cx						; buffer length
+			push '<='
+			call booleanOperators
+			jmp checkTrueCondition
+			
+		handleBiggerE:					; >= operator
+			push bx
+			push cx						; buffer length
+			push '>='
+			call booleanOperators
+			jmp checkTrueCondition
+		
+		checkTrueCondition:
+			mov [execIf], dh	; condition true/ false
+			jmp finishHandleOneLineCommand
+			
+	endIfLbl:
+		mov [inIf], false
 		jmp finishHandleOneLineCommand
-	
 	
 	handleShout:					; shout keyword
 		push cx						; buffer length
@@ -549,18 +605,18 @@ proc handleShoutKeyword
 		add bx, si
 		sub cx, 7
 		
-		push bx		; offset of current var
-		push cx		; var name length
+		push bx					; offset of current var
+		push cx					; var name length
 		call checkExistsVar		; bx now holds the var memory index
 		cmp dh, true
 		jne varDoesntExists
 		
 		; get var value
 		push bx
-		call getValue	 ; value in dx
+		call getValue	 		; value in dx
 		
 		add bx, [bx]
-		mov al, [bx+2]	; type
+		mov al, [bx+2]			; type
 		cmp al, integer
 		je printIntVar
 		
@@ -605,12 +661,12 @@ proc checkExistsVar
 	push cx
 	push di
 			
-	mov ax, param1 		; var name length
+	mov ax, param1 			; var name length
 	
-	mov cx, param2		; var location in buffer
+	mov cx, param2			; var location in buffer
 	xor dh, dh
 	;
-	xor si, si	   ; memory index
+	xor si, si	   			; memory index
 	lea bx, [memoryVariables]
 
 	; finish if memory is empty
@@ -629,9 +685,9 @@ proc checkExistsVar
 		add bx, si
 
 		; compare names
-		push cx		; var location in buffer
-		push bx		; memory offset
-		push ax 	; variable length
+		push cx				; var location in buffer
+		push bx				; memory offset
+		push ax 			; variable length
 		call cmpStrings
 		
 		; return to original pointer
@@ -666,8 +722,6 @@ proc checkExistsVar
 		pop bp
 		ret 4
 endp checkExistsVar
-
-
 
 
 
@@ -781,7 +835,7 @@ endp insertVarToMemory
 
 ;----------------------------------
 ; findOp procedure
-; param: buffer length
+; param: buffer offset, buffer length
 ; return dx (operator)
 ;----------------------------------
 proc findOp
@@ -794,7 +848,7 @@ proc findOp
 	push si
 	
 	mov cx, param1    			; buffer length
-	lea bx, [buffer]			; buffer offset
+	mov bx, param2				; buffer offset
 	xor si, si
 	xor dh, dh
 	
@@ -821,7 +875,7 @@ proc findOp
 		pop bx
 		pop ax
 		pop bp
-		ret 2
+		ret 4
 endp findOp
 
 
@@ -850,6 +904,7 @@ proc assignemtFromBuffer
 	mov bx, cx
 	
 	; handle 1 digit value
+	push 0
 	push 1
 	call getValFromBuffer
 	
@@ -863,6 +918,7 @@ proc assignemtFromBuffer
 		jne lengthAfterStrCheck
 		sub bx, 2
 		
+		push 0
 		push 2
 		call getValFromBuffer
 		cmp ah, '"'
@@ -870,7 +926,7 @@ proc assignemtFromBuffer
 		inc bx
 	
 	lengthAfterStrCheck:
-	mov cx, bx	   ; ax <- var name length
+	mov cx, bx	   						; ax <- var name length
 	
 	; check if var already exists
 	push offset buffer
@@ -895,6 +951,7 @@ proc assignemtFromBuffer
 		je updateStr
 		
 		; get var value
+		push 0
 		push 1  ; operator length
 		call getValFromBuffer			; ax <- new value
 		
@@ -917,7 +974,9 @@ proc assignemtFromBuffer
 			add ax, dx
 			jmp updateVar		
 		
-		updateStr:	; get var value
+		; get var value
+		updateStr:
+			push 0						; start index in buffer
 			push 2 						; operator length + "
 			call getValFromBuffer		; ax <- new value
 			cmp ah, '"'					; if the str is 1 digit -> delete msb
@@ -991,7 +1050,7 @@ endp updateValProc
 
 ;----------------------------------------
 ; 	getValFromBuffer procedure
-; param: operator length
+; param:   operator length, buffer start index
 ; returns: ax
 ;----------------------------------------
 proc getValFromBuffer
@@ -1005,8 +1064,8 @@ proc getValFromBuffer
 	push di
 	
 	mov bx, param1						; operator length
+	mov si, param2					    ; buffer index
 	
-	xor si, si							; buffer index
 	loopBuffer:
 		mov ah, [buffer + si]
 		inc si
@@ -1030,7 +1089,7 @@ proc getValFromBuffer
 		pop cx
 		pop bx
 		pop bp
-		ret 2
+		ret 4
 endp getValFromBuffer
 
 
@@ -1059,6 +1118,7 @@ proc mathOperators
 	dec cx				; remove CR (carriage return)
 	
 	; check var length (buffer length - value length - 2 space, 2 operator)
+	push 0
 	push 2
 	call getValFromBuffer
 	cmp ax, 3031
@@ -1083,6 +1143,7 @@ proc mathOperators
 		call getValue				; dx hold current value
 		
 		; get value from buffer
+		push 0
 		push 2
 		call getValFromBuffer		; ax holds value from buffer
 		
@@ -1183,7 +1244,7 @@ endp mathOperators
 ;----------------------------------------
 ; boolean operators
 ; <, >, ==, !=, <=, >=
-; params: buffer length, operator
+; params: offset to search in,  length, operator
 ; returns: dh (true/ false)
 ;----------------------------------------
 proc booleanOperators
@@ -1195,22 +1256,31 @@ proc booleanOperators
 	push bx
 	push cx
 	
-	mov cx, param2		; buffer length
-	dec cx				; remove CR (carriage return)
+	mov di, 2
+	mov cx, param2				; buffer length
+	dec cx						; remove CR (carriage return)
 	
-	; check var length (buffer length - value length - 2 space, 2 operator)
-	push 2
+	; check if operator is only 1 digit
+	cmp [byte ptr bp+5], 0 
+	jne checkValLength
+	dec di
+	inc cx
+	
+	checkValLength:
+	; check var length (buffer length - 1/2 value length - 2 space, 1/2 operator)
+	push 3
+	push di
 	call getValFromBuffer
 	cmp ax, 3031
 	jb lengthAferValueCheckBoolOperator
 	
 	dec cx ; 1 val
 	
-	lengthAferValueCheckBoolOperator:
+	lengthAferValueCheckBoolOperator:		
 		sub cx, 5					;  2 space, 2 operator, 1 val
 		
 		; check assigned var exists
-		push offset buffer
+		push param3
 		push cx
 		call checkExistsVar
 		
@@ -1224,7 +1294,8 @@ proc booleanOperators
 		mov bx, dx					; bx hold current value (dh is the return value)
 		
 		; get value from buffer
-		push 2
+		push 3
+		push di
 		call getValFromBuffer		; ax holds value from buffer
 		
 		call bufferNumToRealNum		; ax holds hex value
@@ -1290,7 +1361,7 @@ proc booleanOperators
 		
 		add sp, 2
 		pop bp
-		ret 4
+		ret 6
 endp booleanOperators
 
 
@@ -1334,8 +1405,18 @@ start:
 	mov ax, @data
 	mov ds, ax
 	
+	
+	push bp
+	mov bp, sp
+
+	
+	; open testfile.txt
 	call OpenFile
+	
+	; read file content and execute commands
 	call readLineByLine
+	
+	; close file
 	call closeFile
 	
 		
@@ -1356,6 +1437,7 @@ start:
 	newLine
 	newLine
 	printMsg FinishMsg
+	
 exit:
 	mov ax, 4c00h
 	int 21h

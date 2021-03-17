@@ -1,3 +1,4 @@
-x = 9
-x ^= 99
-shout x
+var = 1
+if var < 0
+shout "The difference is to big!"
+endif
