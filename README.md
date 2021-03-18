@@ -82,9 +82,16 @@ x -= 1
 x *= 1
 x /= 1
 x ^= 1
+x %= 2
 ```
 
 ## If statement
+* <
+* >
+* ==
+* !=
+* <=
+* >=
 ```
 x = 0
 if x < 10
@@ -98,6 +105,14 @@ if x != 5
 shout x
 endif
 ```
+
+```
+my_age = 16
+if my_age >= 18
+shout "You can enter the club! Enjoy!"
+endif
+```
+
 
 ## Limits
 * Int on initialization - 2 digits (max 99) 
