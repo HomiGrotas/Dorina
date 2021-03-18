@@ -100,8 +100,8 @@ endif
 ```
 
 ## Limits
-Int on initialization - 2 digits (max 99) \n
-Int after math operations - max 65535 (word size)\n
-String - max length of 2 digits\n
+* Int on initialization - 2 digits (max 99) 
+* Int after math operations - max 65535 (word size)
+* String - max length of 2 digits
 
 coming soon: while loop
