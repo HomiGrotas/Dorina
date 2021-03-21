@@ -9,53 +9,83 @@ STACK 100h
 
 DATASEG
 
-; constants
-false  equ 0
-true   equ 1
-DEBUG  equ false			; DEBUG mode
+; ---------- constants ----------
+FALSE  equ 0
+TRUE   equ 1
+DEBUG  equ FALSE			; DEBUG mode
 
-memorySize equ 500
-lineLength equ 100
-param1 equ [bp + 4]
-param2 equ [bp + 6]
-param3 equ [bp + 8]
-localVar1 equ [bp - 2]
-localVar2 equ [bp - 4]
-localVar3 equ [bp - 6]
+FILENAME_MAX_LENGTH equ 26 	;	(max length is 25, 1 for $)
+MEMORY_SIZE		  	equ 500
+LINE_LENGTH 		equ 100
+
+PARAM1 	   		  	equ [bp + 4]
+PARAM2     		  	equ [bp + 6]
+PARAM3    		  	equ [bp + 8]
+
+LOCAL_VAR1 		  	equ [bp - 2]
+LOCAL_VAR2 		  	equ [bp - 4]
+LOCAL_VAR3 		  	equ [bp - 6]
 
 ; variables types
-integer equ 0
-string equ 1
-boolean equ 2
+INTEGER 		  	equ 0
+STRING 			  	equ 1
+BOOLEAN 		  	equ 2
 
-
-memoryVariables dw memorySize dup('*')     				  ; buffer array - stores the data from the file
-memoryInd dw 0											  ; can be up to 65,535
+; ---------- variables ----------
+memoryVariables dw MEMORY_SIZE dup('*')       ; buffer array - stores the data from the file
+memoryInd 		dw 0						  ; can be up to 65,535 bits
 
 ; variables for file opening
-filename db 'testfile.txt',0	  	  ; file to operate on
-filehandle dw '.'					  ; file handle
+filename 		db FILENAME_MAX_LENGTH   	  ; file to operate on
+filehandle  	dw '.'					  	  ; file handle
 
 ; variables for reading the file
-buffer db lineLength dup('#')				; buffer (line)
-char db ?								 	; char from file 
+buffer 			db LINE_LENGTH dup('#')		  ; buffer (line)
+char 			db ?						  ; char from file 
 
 ; keywords
-shoutKeyword db 'shout'
-ifKeyword db 'if'
-endIfKeyword db 'endif'
-inIf db false
-execIf db false
+shoutKeyword 	db 'shout'
+ifKeyword 		db 'if'
+endIfKeyword	db 'endif'
+inIf 			db FALSE
+execIf 			db FALSE
 
-; messages
-ErrorMsgCouldntFindOp db 'Error: couldnt find an operator or a keyword...', '$'
-ErrorMsgOpen db 'Error: while opening code file...','$'   ; error messages
-ErrorVarDoesntExists db "Error: var doesn't exists", '$'
-ErrorDivideByZero db "Error: can't divide by zero", '$'
-MemoryPrintMsg db '----------------------  MEMORY ----------------------', '$'
-FinishMsg db 'Finished Succesfuly!', '$' ; finished the program
-TrueMsg db 'True', '$'
-FalseMsg db 'False', '$'
+; ---------- messages ----------
+
+; error messages
+ErrorMsgCouldntFindOp 	db 'Error: couldnt find an operator or a keyword...', '$'
+ErrorMsgOpen 			db 'Error: error while opening code file','$'
+ErrorVarDoesntExists 	db "Error: var doesn't exists", '$'
+ErrorDivideByZero 		db "Error: can't divide by zero", '$'
+
+; other messages (informative)
+EnterFileNameMsg 	db "Please enter a valid file name:", '$'
+StartedInterpreting db 'Started interpreting...', 13, 10, 13, 10, 13, 10
+					db '_______Output_______', '$'
+					
+MemoryPrintMsg 		db '----------------------  MEMORY ----------------------', '$'
+FinishMsg 			db 'Finished Succesfuly!', '$' ; finished the program
+DorinaOpenMsg   	db "  _____             _               												", 13                                            
+					db " |  __ \           (_)                                                         		", 13
+					db " | |  | | ___  _ __ _ _ __   __ _                                              		", 13 
+					db " | |  | |/ _ \| '__| | '_ \ / _` |                                             		", 13 
+					db " | |__| | (_) | |  | | | | | (_| |                                             		", 13
+					db " |_____/ \___/|_|  |_|_| |_|\__,_|                                          		", 13
+					db "                                                                                    ", 13
+					db "  ____            _   _           _                  _____ _                 _      ", 13
+					db " |  _ \       _  | \ | |         | |                / ____| |               (_)		", 13
+					db " | |_) |_   _(_) |  \| | __ _  __| | __ ___   __   | (___ | |__   __ _ _ __  _ 		", 13
+					db " |  _ <| | | |   | . ` |/ _` |/ _` |/ _` \ \ / /    \___ \| '_ \ / _` | '_ \| |		", 13 
+					db " | |_) | |_| |_  | |\  | (_| | (_| | (_| |\ V /     ____) | | | | (_| | | | | |		", 13
+					db " |____/ \__, (_) |_| \_|\__,_|\__,_|\__,_| \_/     |_____/|_| |_|\__,_|_| |_|_|		", 13
+					db "         __/ |                                                                 		", 13 
+					db " __     |___/              ___   ___ ___  __                                   		", 13 
+					db " \ \   / /             _  |__ \ / _ \__ \/_ |                                 		", 13 
+					db "  \ \_/ /__  __ _ _ __(_)    ) | | | | ) || |                                  		", 13 
+					db "   \   / _ \/ _` | '__|     / /| | | |/ / | |                                  		", 13 
+					db "    | |  __/ (_| | |   _   / /_| |_| / /_ | |                                  		", 13 
+					db "    |_|\___|\__,_|_|  (_) |____|\___/____||_|                                  		", 13, '$'
+				
 
 CODESEG
 jumps		; support far jumps
@@ -69,19 +99,26 @@ jumps		; support far jumps
 ; Macro: newLine
 ;   macro to go down a line in console
 ;-------------------------------------------
-macro newLine
-	; new line
-	mov dl, 10		; ascii ---> 10 New Line
-	mov ah, 02h
-	int 21h
-	mov dl, 13		; ascii ---> 13 Carriage Return
-	mov ah, 02h
-	int 21h
+macro newLine times
+	local newLineLoop
+	push cx
+	mov cx, times
+	
+	newLineLoop:
+		; new line
+		mov dl, 10		; ascii ---> 10 New Line
+		mov ah, 02h
+		int 21h
+		mov dl, 13		; ascii ---> 13 Carriage Return
+		mov ah, 02h
+		int 21h
+		loop newLineLoop
+	pop cx
 endm
 
 ;-------------------------------------------
 ; Macro: printMsg
-;   macro to print a string as parameter
+;   macro to print a STRING as parameter
 ;-------------------------------------------
 macro printMsg msg_to_print
     mov dx, offset &msg_to_print
@@ -91,7 +128,7 @@ endm
 
 
 ;------------------------------------------------------------------------------------------------------
-; Helpers procedures - print array, get string, 
+; Helpers procedures - print array, get STRING, 
 ;------------------------------------------------------------------------------------------------------
 
 ;-----------------------------------
@@ -109,11 +146,11 @@ proc printArray
 	push dx
 	
 	
-	mov bx, param1	; array offset 
-	mov cx, param2  ; array length
+	mov bx, PARAM1	; array offset 
+	mov cx, PARAM2  ; array length
 	xor si, si
 	
-	newLine
+	newLine 1
 	mov ah, 2  		; write mode	
 	
 	; print array
@@ -135,11 +172,11 @@ endp printArray
 
 
 ;-----------------------------------
-; compare string procedure - with same length and one is the opposite of the other
-; params: length, offset to string1, offset to string2
+; compare STRING procedure - with the same length
+; params: length, offset to STRING1, offset to STRING2
 ; returns with dh
 ;-----------------------------------
-proc cmpStrings
+proc cmpSTRINGs
 	push bp
 	mov bp, sp
 	
@@ -149,11 +186,11 @@ proc cmpStrings
 	push bx
 	push cx
 	
-	mov cx, param1 		; length of var name					
+	mov cx, PARAM1 		; length of var name					
 	shr cx, 1	   		; comparing word size
 	
-	mov si, param2 		; offset for first name
-	mov bx, param3 		; offset for second name
+	mov si, PARAM2 		; offset for first name
+	mov bx, PARAM3 		; offset for second name
 	
 	cmp cx, 0			; if it's just one char -> cmp just byte
 	jne cmpLoop
@@ -176,7 +213,7 @@ proc cmpStrings
 		loop cmpLoop
 	
 	
-	mov ax, param1		; if length is odd there is one more digit to compare
+	mov ax, PARAM1		; if length is odd there is one more digit to compare
 	test ax, 1
 	jz equals
 	
@@ -187,13 +224,13 @@ proc cmpStrings
 	jne notEq
 	
 	equals:
-		mov dh, true ; default return value - equal
-		jmp finishCmpStrings
+		mov dh, TRUE ; default return value - equal
+		jmp finishCmpSTRINGs
 	
 	notEq:
 		xor dh, dh ; 0- not equal
 	
-	finishCmpStrings:
+	finishCmpSTRINGs:
 		pop cx
 		pop bx
 		pop ax
@@ -202,7 +239,7 @@ proc cmpStrings
 		
 		pop bp
 		ret 6
-endp cmpStrings
+endp cmpSTRINGs
 
 
 ;------------------------------------------------------------------------------------------------------
@@ -210,17 +247,45 @@ endp cmpStrings
 ;------------------------------------------------------------------------------------------------------
 ; all procedures use constants
 
+
+;--------------------------------------------------------------------
+; proc get filename from user procedure
+;--------------------------------------------------------------------
+proc getFilename
+	push ax
+	push bx
+	push si
+	
+	mov dx, offset filename
+	mov ah, 0Ah
+	int 21h
+	
+	mov si, offset filename + 1 ;NUMBER OF CHARACTERS ENTERED.
+	mov cl, [ si ]				;MOVE LENGTH TO CL.
+	mov ch, 0      				;CLEAR CH TO USE CX. 
+	inc cx 						;TO REACH last char.
+	add si, cx 					;NOW SI POINTS TO last char.
+	mov al, 0
+	mov [ si ], al 				;REPLACE last chat (ENTER) BY '$'.	
+	newLine 1
+	
+	pop si
+	pop bx
+	pop	ax
+	ret
+endp getFilename
+
 ;-------------------------
 ; open file procedure
 ; opens file which his name is in filename variable
 ;-------------------------
-proc OpenFile
+proc OpenFile	
 	; Open file
 	mov ah, 3Dh
 	xor al, al					; read only
-	lea dx, [filename]
+	mov dx, offset filename + 2
 	int 21h
-	jc openerror				; CF flag
+	jc openerror				; CF flag - if on means there is an error
 	mov [filehandle], ax		; file handle we got from DOS (used later for closing the file)
 	ret
 	
@@ -281,7 +346,7 @@ endp closeFile
 
 
 ;------------------------------------------------------------------------------------------------------
-; Handlers procedures - understand command 
+; Handlers procedures - understand a command 
 ;------------------------------------------------------------------------------------------------------
 
 ;-----------------------------------
@@ -296,7 +361,7 @@ proc handleOneLineCommand
 	push bx
 	push cx
 	
-	mov cx, param1    			; buffer length
+	mov cx, PARAM1    			; buffer length
 	
 	; print if in DEBUG mode
 	mov ah, DEBUG
@@ -311,23 +376,23 @@ proc handleOneLineCommand
 	push cx
 	push bx
 	call printArray
-	newLine
+	newLine 1
 	
 	cmpOp:
 		; check whether endif keyword is used
 		push offset endIfKeyword
 		push offset buffer
 		push 5
-		call cmpStrings
+		call cmpSTRINGs
 		
 		; if endif keyword is used -> jmp to it's label
-		cmp dh, true
+		cmp dh, TRUE
 		je endIfLbl
 		
-		; if in if statement and it's false -> don't execute
-		cmp [inIf], false
+		; if in if statement and it's FALSE -> don't execute
+		cmp [inIf], FALSE
 		je checkOp
-		cmp [execIf], false
+		cmp [execIf], FALSE
 		je finishHandleOneLineCommand
 		
 		; search for operator / keyword
@@ -371,18 +436,18 @@ proc handleOneLineCommand
 		push offset ifKeyword
 		push offset buffer
 		push 2
-		call cmpStrings
+		call cmpSTRINGs
 		
-		cmp dh, true
+		cmp dh, TRUE
 		je startIf
 		
 		; check if shout keyword is used
 		push offset shoutKeyword
 		push offset buffer
 		push 5
-		call cmpStrings
+		call cmpSTRINGs
 		
-		cmp dh, true
+		cmp dh, TRUE
 		je handleShout
 		
 		
@@ -433,7 +498,7 @@ proc handleOneLineCommand
 	
 	; handle if keyword
 	startIf:
-		mov [inIf], true	; we are in if statement now (true)
+		mov [inIf], TRUE	; we are in if statement now (TRUE)
 		lea bx, [buffer]
 		add bx, 3	; 2 if, 1 space
 		sub cx, 3	; 2 if, 1 space
@@ -443,7 +508,7 @@ proc handleOneLineCommand
 		call findOp		; dx <- operator
 		
 		;---------------------
-		; boolean operators check:
+		; BOOLEAN operators check:
 		cmp dx, '<'
 		je handleSmaller
 		
@@ -467,50 +532,50 @@ proc handleOneLineCommand
 			push bx
 			push cx						; buffer length
 			push '<'
-			call booleanOperators
-			jmp checkTrueCondition
+			call BOOLEANOperators
+			jmp checkTRUECondition
 			
 		handleGreater:					; > operator
 			push bx
 			push cx						; buffer length
 			push '>'
-			call booleanOperators
-			jmp checkTrueCondition
+			call BOOLEANOperators
+			jmp checkTRUECondition
 			
 		handleEquals:					; == operator
 			push bx
 			push cx						; buffer length
 			push '=='
-			call booleanOperators
-			jmp checkTrueCondition
+			call BOOLEANOperators
+			jmp checkTRUECondition
 			
 		handleNEquals:					; != operator
 			push bx
 			push cx						; buffer length
 			push '!='
-			call booleanOperators
-			jmp checkTrueCondition
+			call BOOLEANOperators
+			jmp checkTRUECondition
 			
 		handleSmallerE:					; <= operator
 			push bx
 			push cx						; buffer length
 			push '<='
-			call booleanOperators
-			jmp checkTrueCondition
+			call BOOLEANOperators
+			jmp checkTRUECondition
 			
 		handleBiggerE:					; >= operator
 			push bx
 			push cx						; buffer length
 			push '>='
-			call booleanOperators
-			jmp checkTrueCondition
+			call BOOLEANOperators
+			jmp checkTRUECondition
 		
-		checkTrueCondition:
-			mov [execIf], dh	; condition true/ false
+		checkTRUECondition:
+			mov [execIf], dh	; condition TRUE/ FALSE
 			jmp finishHandleOneLineCommand
 			
 	endIfLbl:
-		mov [inIf], false
+		mov [inIf], FALSE
 		jmp finishHandleOneLineCommand
 	
 	handleShout:					; shout keyword
@@ -573,7 +638,7 @@ endp hexToAscii
 
 ;-----------------------------------------
 ; handle shout keyword procedure
-;	checks if content is a string/ var and prints accordingly
+;	checks if the content is a STRING/ var and prints accordingly
 ;-----------------------------------------
 proc handleShoutKeyword
 	push bp
@@ -584,11 +649,11 @@ proc handleShoutKeyword
 	push bx
 	push cx
 	
-	mov cx, param1		; buffer length
+	mov cx, PARAM1		; buffer length
 	mov si, 6			; 5 shout length, 1 stand on command content
 	mov ah, 2			; write to screen
 	
-	; check if need to print a string or a variable
+	; check if need to print a STRING or a variable
 	mov dl, [buffer + si]
 	cmp dl, '"'
 	jne printVar
@@ -615,7 +680,7 @@ proc handleShoutKeyword
 		push bx					; offset of current var
 		push cx					; var name length
 		call checkExistsVar		; bx now holds the var memory index
-		cmp dh, true
+		cmp dh, TRUE
 		jne varDoesntExists
 		
 		; get var value
@@ -624,7 +689,7 @@ proc handleShoutKeyword
 		
 		add bx, [bx]
 		mov al, [bx+2]			; type
-		cmp al, integer
+		cmp al, INTEGER
 		je printIntVar
 		
 		; print value - str
@@ -641,10 +706,10 @@ proc handleShoutKeyword
 	jmp finishHandleShoutKeyword
 	varDoesntExists:
 		printMsg ErrorVarDoesntExists
-		newLine
+		newLine 1
 	
 	finishHandleShoutKeyword:
-		newLine					; go a line down in console
+		newLine	1				; go a line down in console
 		pop cx
 		pop bx
 		pop dx
@@ -668,9 +733,9 @@ proc checkExistsVar
 	push cx
 	push di
 			
-	mov ax, param1 			; var name length
+	mov ax, PARAM1 			; var name length
 	
-	mov cx, param2			; var location in buffer
+	mov cx, PARAM2			; var location in buffer
 	xor dh, dh
 	
 	xor si, si	   			; memory index
@@ -695,14 +760,14 @@ proc checkExistsVar
 		push cx				; var location in buffer
 		push bx				; memory offset
 		push ax 			; variable length
-		call cmpStrings
+		call cmpSTRINGs
 		
 		; return to original pointer
 		sub bx, si
 		sub si, 2
 		
 		; if names are equal
-		cmp dh, true
+		cmp dh, TRUE
 		je found
 				
 		keepLooping:
@@ -718,7 +783,7 @@ proc checkExistsVar
 	
 	; var exists
 	found:
-		mov dh, true
+		mov dh, TRUE
 		mov bx, si	; index of the start of the variable in memory
 		
 	finishCheckExistsVar:		
@@ -752,7 +817,7 @@ proc insertVarToMemory
 	xor si, si				; buffer index
 	mov di, [memoryInd]		; memory index
 	
-	mov localVar1, di		; localVar1 <- memory ind
+	mov LOCAL_VAR1, di		; LOCAL_VAR1 <- memory ind
 	add di, 2				; save location for length
 		
 	; insert name until reaches a space
@@ -770,7 +835,7 @@ proc insertVarToMemory
 	
 	finishedInsertName:
 		; insert length
-		mov bx, localVar1
+		mov bx, LOCAL_VAR1
 		mov [bx], si		; si <- var name length
 		
 		; check value type
@@ -779,7 +844,7 @@ proc insertVarToMemory
 		
 		inc di
 		cmp al, '"'
-		je insert1ValStr		; string type - at least 1 char
+		je insert1ValStr		; STRING type - at least 1 char
 		
 		; int type:
 		mov ah, [buffer + si + 4]
@@ -803,7 +868,7 @@ proc insertVarToMemory
 			add ax, dx
 			
 			; insert type
-			mov  [byte ptr memoryVariables + di - 1], integer
+			mov  [byte ptr memoryVariables + di - 1], INTEGER
 			
 			; insert value
 			mov  [memoryVariables + di], ax
@@ -819,7 +884,7 @@ proc insertVarToMemory
 			
 			insert2ValStr:
 				; insert type
-				mov  [byte ptr memoryVariables + di - 1], string
+				mov  [byte ptr memoryVariables + di - 1], STRING
 				
 				; insert value
 				mov  [memoryVariables + di], ax
@@ -854,8 +919,8 @@ proc findOp
 	push cx
 	push si
 	
-	mov cx, param1    			; buffer length
-	mov bx, param2				; buffer offset
+	mov cx, PARAM1    			; buffer length
+	mov bx, PARAM2				; buffer offset
 	xor si, si					; buffer index
 	xor dh, dh					; operator
 	
@@ -903,7 +968,7 @@ proc assignemtFromBuffer
 	
 	xor ah, ah
 	lea bx, [buffer]	; buffer offset
-	mov cx, param1		; buffer length
+	mov cx, PARAM1		; buffer length
 	xor si, si
 	
 	; cx <- length of var name
@@ -923,7 +988,7 @@ proc assignemtFromBuffer
 		cmp al, '"'
 		jne lengthAfterStrCheck	; jump if value isn't in str format
 		
-		; string value
+		; STRING value
 		sub cx, 2				; sub 2 digits value
 			
 		; check 1 digit str
@@ -940,7 +1005,7 @@ proc assignemtFromBuffer
 	push offset buffer
 	push cx  							; var name length
 	call checkExistsVar					; var index in bx
-	mov localVar1, bx					; var index
+	mov LOCAL_VAR1, bx					; var index
 	
 	; check if var exists
 	cmp dh, 1
@@ -955,7 +1020,7 @@ proc assignemtFromBuffer
 		; check var type
 		add bx, [bx]				; skip var name
 		mov bh, [bx+2]  			; get var type
-		cmp bh, string
+		cmp bh, STRING
 		je updateStr
 		
 		; get var value
@@ -992,7 +1057,7 @@ proc assignemtFromBuffer
 			xor ah, ah
 			
 		updateVar:
-			mov bx, localVar1			; var index
+			mov bx, LOCAL_VAR1			; var index
 			push ax						; var new value
 			call updateValProc			; update the variable value
 
@@ -1024,7 +1089,7 @@ proc getValue
 		
 	; bx should point for the length of the variable
 	lea bx, [memoryVariables]
-	add bx, param1
+	add bx, PARAM1
 	
 	; skip var name
 	add bx, [bx] 		; bx += var name length
@@ -1043,7 +1108,7 @@ proc updateValProc
 	push bp
 	mov bp, sp
 	
-	mov dx, param1			; new value
+	mov dx, PARAM1			; new value
 	
 	; skip var name
 	add bx, [bx] 			; bx += var name length
@@ -1071,8 +1136,8 @@ proc getValFromBuffer
 	push dx
 	push di
 	
-	mov bx, param1						; operator length
-	mov si, param2					    ; buffer index
+	mov bx, PARAM1						; operator length
+	mov si, PARAM2					    ; buffer index
 	
 	loopBuffer:
 		mov ah, [buffer + si]
@@ -1122,7 +1187,7 @@ proc mathOperators
 	push cx
 	push dx
 	
-	mov cx, param2		; buffer length
+	mov cx, PARAM2		; buffer length
 	dec cx				; remove CR (carriage return)
 	
 	; check var length (buffer length - value length - 2 space, 2 operator)
@@ -1156,7 +1221,7 @@ proc mathOperators
 		call getValFromBuffer		; ax holds value from buffer
 		
 		call bufferNumToRealNum		; ax holds hex value
-		mov cx, param1				; operator
+		mov cx, PARAM1				; operator
 
 		cmp cx, '+='
 		je plus
@@ -1255,12 +1320,12 @@ endp mathOperators
 
 
 ;----------------------------------------
-; boolean operators
+; BOOLEAN operators
 ; <, >, ==, !=, <=, >=
 ; params: offset to search in,  length, operator
-; returns: dh (true/ false)
+; returns: dh (TRUE/ FALSE)
 ;----------------------------------------
-proc booleanOperators
+proc BOOLEANOperators
 	push bp
 	mov bp, sp
 	sub sp, 2
@@ -1270,7 +1335,7 @@ proc booleanOperators
 	push cx
 	
 	mov di, 2
-	mov cx, param2				; buffer length
+	mov cx, PARAM2				; buffer length
 	dec cx						; remove CR (carriage return)
 	
 	; check if operator is only 1 digit
@@ -1293,7 +1358,7 @@ proc booleanOperators
 		sub cx, 5					;  2 space, 2 operator, 1 val
 		
 		; check assigned var exists
-		push param3
+		push PARAM3
 		push cx
 		call checkExistsVar
 		
@@ -1312,8 +1377,8 @@ proc booleanOperators
 		call getValFromBuffer		; ax holds value from buffer
 		
 		call bufferNumToRealNum		; ax holds hex value
-		mov cx, param1				; operator
-		xor dh, dh					; default status (false)
+		mov cx, PARAM1				; operator
+		xor dh, dh					; default status (FALSE)
 		
 		cmp cx, '<'
 		je smaller
@@ -1335,39 +1400,39 @@ proc booleanOperators
 		
 		smaller:
 			cmp bx, ax
-			jb trueCondition
-			jmp finishBooleanOperators
+			jb TRUECondition
+			jmp finishBOOLEANOperators
 			
 		greater:
 			cmp bx, ax
-			ja trueCondition
-			jmp finishBooleanOperators
+			ja TRUECondition
+			jmp finishBOOLEANOperators
 			
 		equalsOp:
 			cmp bx, ax
-			je trueCondition
-			jmp finishBooleanOperators
+			je TRUECondition
+			jmp finishBOOLEANOperators
 		
 		nEquals:
 			cmp bx, ax
-			jne trueCondition
-			jmp finishBooleanOperators
+			jne TRUECondition
+			jmp finishBOOLEANOperators
 		
 		smallerE:
 			cmp bx, ax
-			jbe trueCondition
-			jmp finishBooleanOperators
+			jbe TRUECondition
+			jmp finishBOOLEANOperators
 		
 		biggerE:
 			cmp bx, ax
-			jae trueCondition
-			jmp finishBooleanOperators
+			jae TRUECondition
+			jmp finishBOOLEANOperators
 		
-	jmp finishBooleanOperators
-	trueCondition:
-		mov dh, true
+	jmp finishBOOLEANOperators
+	TRUECondition:
+		mov dh, TRUE
 
-	finishBooleanOperators:
+	finishBOOLEANOperators:
 		pop cx
 		pop bx
 		pop ax
@@ -1375,7 +1440,7 @@ proc booleanOperators
 		add sp, 2
 		pop bp
 		ret 6
-endp booleanOperators
+endp BOOLEANOperators
 
 
 ;--------------------------------------------------------------------
@@ -1411,6 +1476,7 @@ proc bufferNumToRealNum
 		ret
 endp bufferNumToRealNum
 
+
 ;----------------
 ; START
 ;----------------
@@ -1418,9 +1484,20 @@ start:
 	mov ax, @data
 	mov ds, ax
 	
-	; open testfile.txt
+	; print Dorina Big title
+	printMsg DorinaOpenMsg
+	newLine 1
+
+	printMsg EnterFileNameMsg
+	newLine 1
+
+	call getFilename	
+	
+	; open codefile(.txt)
 	call OpenFile
 	
+	printMsg StartedInterpreting
+	newLine 2
 	; read file content and execute commands
 	call readLineByLine
 	
@@ -1434,16 +1511,13 @@ start:
 	je exit
 	
 	; print memory
-	newLine
-	newLine
-	newLine
+	newLine 3
 	printMsg MemoryPrintMsg
-	push memorySize
+	push MEMORY_SIZE
 	push offset memoryVariables
 	call printArray
 	
-	newLine
-	newLine
+	newLine 2
 	printMsg FinishMsg
 	
 exit:
