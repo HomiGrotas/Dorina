@@ -1,5 +1,5 @@
 # Dorina programming language
-Simple programming language with assembly interpeter and python interpeter.
+A simple programming language with assembly interpreter and a python interpreter.
 This is the final project of my assembly learning.
 
 
@@ -9,8 +9,8 @@ This is the final project of my assembly learning.
 
 ## Stages:
 - [x] design the language
-- [x] build a python interpeter
-- [ ] build an assembly interpeter based on the python version
+- [x] build a python interpreter
+- [ ] build an assembly interpreter based on the python version
 
 
 
