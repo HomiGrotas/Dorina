@@ -1,5 +1,5 @@
 # Dorina programming language
-A simple programming language with assembly interpreter and a python interpreter.
+A simple programming language with an assembly interpreter and a python interpreter.
 This is the final project of my assembly learning.
 
 
@@ -37,7 +37,7 @@ This is the final project of my assembly learning.
  
  # Documentation
 
- ## Variables Decleration
+ ## Variables Declaration
  ### Integers
 ```
 x = 5
