@@ -1,5 +1,6 @@
-![alt text](https://github.com/HomiGrotas/Dorina/blob/main/images/dorinaImage.png?raw=true)
-
+<p align="center">
+  <img width="460" height="300" src="https://github.com/HomiGrotas/Dorina/blob/main/images/dorinaImage.png?raw=true">
+</p>
 
 # Dorina programming language
 A simple programming language with an assembly interpreter and a python interpreter.
