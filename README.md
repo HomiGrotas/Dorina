@@ -1,3 +1,6 @@
+![alt text](https://github.com/HomiGrotas/Dorina/blob/main/images/dorinaImage.png?raw=true)
+
+
 # Dorina programming language
 A simple programming language with an assembly interpreter and a python interpreter.
 This is the final project of my assembly learning.
