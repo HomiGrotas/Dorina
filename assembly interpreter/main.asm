@@ -9,29 +9,31 @@ STACK 100h
 
 DATASEG
 
-; ---------- constants ----------
+; ---------------------------------------------- constants ----------------------------------------------
 FALSE  equ 0
 TRUE   equ 1
-DEBUG  equ FALSE			; DEBUG mode
+DEBUG  equ FALSE						; DEBUG mode (prints code lines while interpreting and prints program memory at the end)
 
-FILENAME_MAX_LENGTH equ 26 	;	(max length is 25, 1 for $)
-MEMORY_SIZE		  	equ 500
-LINE_LENGTH 		equ 100
+FILENAME_MAX_LENGTH equ 26 				;	(max length is 25, 1 for $)
+MEMORY_SIZE		  	equ 500				; 	interpreter variables memory
+LINE_LENGTH 		equ 100				; 	max line length (used in the buffer)
 
+; ---------- procedures parameters -------------
 PARAM1 	   		  	equ [bp + 4]
 PARAM2     		  	equ [bp + 6]
 PARAM3    		  	equ [bp + 8]
 
+; ---------- procedure local variables ---------
 LOCAL_VAR1 		  	equ [bp - 2]
 LOCAL_VAR2 		  	equ [bp - 4]
 LOCAL_VAR3 		  	equ [bp - 6]
 
-; variables types
+; --------------- variables types --------------
 INTEGER 		  	equ 0
 STRING 			  	equ 1
 BOOLEAN 		  	equ 2
 
-; ---------- variables ----------
+; ---------------------------------------------- variables ----------------------------------------------
 memoryVariables dw MEMORY_SIZE dup('*')       ; buffer array - stores the data from the file
 memoryInd 		dw 0						  ; can be up to 65,535 bits
 
@@ -47,8 +49,8 @@ char 			db ?						  ; char from file
 shoutKeyword 	db 'shout'
 ifKeyword 		db 'if'
 endIfKeyword	db 'endif'
-inIf 			db FALSE
-execIf 			db FALSE
+inIf 			db FALSE					  ; whether the interpreter is in an if statement 
+execIf 			db FALSE					  ; whether the if statement is true (and therefore the code should be executed)
 
 ; ---------- messages ----------
 
@@ -64,7 +66,7 @@ StartedInterpreting db 'Started interpreting...', 13, 10, 13, 10, 13, 10
 					db '_______Output_______', '$'
 					
 MemoryPrintMsg 		db '----------------------  MEMORY ----------------------', '$'
-FinishMsg 			db 'Finished Succesfuly!', '$' ; finished the program
+FinishMsg 			db 'Finished Succesfuly!', '$' 																			; finished the program
 DorinaOpenMsg   	db "  _____             _               												", 13                                            
 					db " |  __ \           (_)                                                         		", 13
 					db " | |  | | ___  _ __ _ _ __   __ _                                              		", 13 
@@ -176,7 +178,7 @@ endp printArray
 ; params: length, offset to STRING1, offset to STRING2
 ; returns with dh
 ;-----------------------------------
-proc cmpSTRINGs
+proc cmpStrings
 	push bp
 	mov bp, sp
 	
@@ -186,13 +188,13 @@ proc cmpSTRINGs
 	push bx
 	push cx
 	
-	mov cx, PARAM1 		; length of var name					
-	shr cx, 1	   		; comparing word size
+	mov cx, PARAM1 						; length of var name					
+	shr cx, 1	   						; comparing word size
 	
-	mov si, PARAM2 		; offset for first name
-	mov bx, PARAM3 		; offset for second name
+	mov si, PARAM2 						; offset for first name
+	mov bx, PARAM3 						; offset for second name
 	
-	cmp cx, 0			; if it's just one char -> cmp just byte
+	cmp cx, 0							; if it's just one char -> cmp just byte
 	jne cmpLoop
 	
 	mov ah, [bx]
@@ -201,7 +203,7 @@ proc cmpSTRINGs
 	je equals
 	jmp notEq
 	
-	; loop through the two names (checks in pairs for effiecenty)
+										; loop through the two names (checks in pairs for effiecenty)
 	cmpLoop:
 		mov ax, [bx]
 		mov dx, [si]
@@ -213,7 +215,7 @@ proc cmpSTRINGs
 		loop cmpLoop
 	
 	
-	mov ax, PARAM1		; if length is odd there is one more digit to compare
+	mov ax, PARAM1						; if length is odd there is one more digit to compare
 	test ax, 1
 	jz equals
 	
@@ -224,13 +226,13 @@ proc cmpSTRINGs
 	jne notEq
 	
 	equals:
-		mov dh, TRUE ; default return value - equal
-		jmp finishCmpSTRINGs
+		mov dh, TRUE 					; default return value - equal
+		jmp finishCmpStrings
 	
 	notEq:
-		xor dh, dh ; 0- not equal
+		xor dh, dh 						; 0 - not equal
 	
-	finishCmpSTRINGs:
+	finishCmpStrings:
 		pop cx
 		pop bx
 		pop ax
@@ -239,7 +241,7 @@ proc cmpSTRINGs
 		
 		pop bp
 		ret 6
-endp cmpSTRINGs
+endp cmpStrings
 
 
 ;------------------------------------------------------------------------------------------------------
@@ -260,13 +262,13 @@ proc getFilename
 	mov ah, 0Ah
 	int 21h
 	
-	mov si, offset filename + 1 ;NUMBER OF CHARACTERS ENTERED.
-	mov cl, [ si ]				;MOVE LENGTH TO CL.
-	mov ch, 0      				;CLEAR CH TO USE CX. 
-	inc cx 						;TO REACH last char.
-	add si, cx 					;NOW SI POINTS TO last char.
+	mov si, offset filename + 1 	; 1- number of  chars entered.
+	mov cl, [ si ]					; move length to cl.
+	mov ch, 0      					; clear ch to use cx. 
+	inc cx 							; to reach last char.
+	add si, cx 						; now si points to last char.
 	mov al, 0
-	mov [ si ], al 				;REPLACE last chat (ENTER) BY '$'.	
+	mov [ si ], al 					; replace last chat (ENTER) BY '$'.	
 	newLine 1
 	
 	pop si
@@ -383,7 +385,7 @@ proc handleOneLineCommand
 		push offset endIfKeyword
 		push offset buffer
 		push 5
-		call cmpSTRINGs
+		call cmpStrings
 		
 		; if endif keyword is used -> jmp to it's label
 		cmp dh, TRUE
@@ -436,7 +438,7 @@ proc handleOneLineCommand
 		push offset ifKeyword
 		push offset buffer
 		push 2
-		call cmpSTRINGs
+		call cmpStrings
 		
 		cmp dh, TRUE
 		je startIf
@@ -445,7 +447,7 @@ proc handleOneLineCommand
 		push offset shoutKeyword
 		push offset buffer
 		push 5
-		call cmpSTRINGs
+		call cmpStrings
 		
 		cmp dh, TRUE
 		je handleShout
@@ -498,14 +500,14 @@ proc handleOneLineCommand
 	
 	; handle if keyword
 	startIf:
-		mov [inIf], TRUE	; we are in if statement now (TRUE)
+		mov [inIf], TRUE			; we are in if statement now (TRUE)
 		lea bx, [buffer]
-		add bx, 3	; 2 if, 1 space
-		sub cx, 3	; 2 if, 1 space
+		add bx, 3					; 2 if, 1 space (offset)
+		sub cx, 3					; 2 if, 1 space (array length)
 		
-		push bx		; array offset
-		push cx		; array length
-		call findOp		; dx <- operator
+		push bx						; array offset
+		push cx						; array length
+		call findOp					; dx <- operator
 		
 		;---------------------
 		; BOOLEAN operators check:
@@ -532,42 +534,42 @@ proc handleOneLineCommand
 			push bx
 			push cx						; buffer length
 			push '<'
-			call BOOLEANOperators
+			call BooleanOperators
 			jmp checkTRUECondition
 			
 		handleGreater:					; > operator
 			push bx
 			push cx						; buffer length
 			push '>'
-			call BOOLEANOperators
+			call BooleanOperators
 			jmp checkTRUECondition
 			
 		handleEquals:					; == operator
 			push bx
 			push cx						; buffer length
 			push '=='
-			call BOOLEANOperators
+			call BooleanOperators
 			jmp checkTRUECondition
 			
 		handleNEquals:					; != operator
 			push bx
 			push cx						; buffer length
 			push '!='
-			call BOOLEANOperators
+			call BooleanOperators
 			jmp checkTRUECondition
 			
 		handleSmallerE:					; <= operator
 			push bx
 			push cx						; buffer length
 			push '<='
-			call BOOLEANOperators
+			call BooleanOperators
 			jmp checkTRUECondition
 			
 		handleBiggerE:					; >= operator
 			push bx
 			push cx						; buffer length
 			push '>='
-			call BOOLEANOperators
+			call BooleanOperators
 			jmp checkTRUECondition
 		
 		checkTRUECondition:
@@ -760,7 +762,7 @@ proc checkExistsVar
 		push cx				; var location in buffer
 		push bx				; memory offset
 		push ax 			; variable length
-		call cmpSTRINGs
+		call cmpStrings
 		
 		; return to original pointer
 		sub bx, si
@@ -1325,7 +1327,7 @@ endp mathOperators
 ; params: offset to search in,  length, operator
 ; returns: dh (TRUE/ FALSE)
 ;----------------------------------------
-proc BOOLEANOperators
+proc BooleanOperators
 	push bp
 	mov bp, sp
 	sub sp, 2
@@ -1440,7 +1442,7 @@ proc BOOLEANOperators
 		add sp, 2
 		pop bp
 		ret 6
-endp BOOLEANOperators
+endp BooleanOperators
 
 
 ;--------------------------------------------------------------------
