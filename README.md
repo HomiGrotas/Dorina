@@ -1,5 +1,5 @@
 <p align="center">
-  <img width="460" height="300" src="https://github.com/HomiGrotas/Dorina/blob/main/images/dorinaImage.png?raw=true">
+  <img width="460" height="400" src="https://github.com/HomiGrotas/Dorina/blob/main/images/dorinaImage.png?raw=true">
 </p>
 
 # Dorina programming language
