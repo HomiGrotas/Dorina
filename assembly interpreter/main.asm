@@ -18,7 +18,7 @@ DEBUG  				equ FALSE			; 	DEBUG mode (prints code lines while interpreting and p
 FILENAME_MAX_LENGTH 		equ 26 				;	(max length is 25, 1 for $)
 MEMORY_SIZE			equ 500				; 	interpreter variables memory
 LINE_LENGTH 			equ 100				; 	max line length (used in the buffer)
-VARIABLE_MEM_SIZE		equ 20				; 	bits size of var in memory
+VARIABLE_MEM_SIZE		equ 20				; 	bytes size of var in memory (int is 2 bytes & str is dependant of this constant)
 
 ; ---------- procedures parameters -------------
 PARAM1 	   		  	equ [bp + 4]
@@ -36,7 +36,7 @@ STRING 			  	equ 1
 BOOLEAN 		  	equ 2
 
 ; ---------------------------------------------- variables ----------------------------------------------
-memoryVariables 	dw MEMORY_SIZE dup('*')           ; buffer array - stores the data from the file
+memoryVariables 	dw MEMORY_SIZE dup(0)           ; buffer array - stores the data from the file
 memoryInd 		dw 0				  ; can be up to 65,535 bits
 
 ; variables for file opening
@@ -64,6 +64,7 @@ ErrorMsgCouldntFindOp 	db 'Error: couldnt find an operator or a keyword...', '$'
 ErrorMsgOpen 		db 'Error: error while opening code file','$'
 ErrorVarDoesntExists 	db "Error: var doesn't exists", '$'
 ErrorDivideByZero 	db "Error: can't divide by zero", '$'
+ErrorStringTooLong 	db "Warning: the string entered is to long. Entered max length possible.",'$'
 
 ; other messages (informative)
 EnterFileNameMsg 	db "Please enter a valid file name:", '$'
@@ -656,9 +657,9 @@ proc handleShoutKeyword
 	push bx
 	push cx
 	
-	mov cx, PARAM1				; buffer length
-	mov si, 6				; 5 shout length, 1 stand on command content
-	mov ah, 2				; write to screen
+	mov cx, PARAM1						; buffer length
+	mov si, 6						; 5 shout length, 1 stand on command content
+	mov ah, 2						; write to screen
 	
 	; check if need to print a STRING or a variable
 	mov dl, [buffer + si]
@@ -666,13 +667,13 @@ proc handleShoutKeyword
 	jne printVar
 	
 	; printStr:
-		inc si				; 1 "
+		inc si						; 1 "
 		shoutPrintLoop:
 			mov dl, [buffer + si]
 			cmp dl, '"'
 			je finishHandleShoutKeyword
 			
-			int 21h	 		; print char
+			int 21h	 				; print char
 			
 			inc si
 			jmp shoutPrintLoop
@@ -681,33 +682,49 @@ proc handleShoutKeyword
 	printVar:
 		; check whether var exists and get its index
 		lea bx, [buffer]
-		add bx, si				; index of var name in buffer
-		sub cx, 7				; 5 shout, 1 space, 1 CR
+		add bx, si					; index of var name in buffer
+		sub cx, 7					; 5 shout, 1 space, 1 CR
 		
-		push bx					; offset of current var
-		push cx					; var name length
-		call checkExistsVar			; bx now holds the var memory index
+		push bx						; offset of current var
+		push cx						; var name length
+		call checkExistsVar				; bx now holds the var memory index
 		cmp dh, TRUE
 		jne varDoesntExists
 		
-		; get var value
 		push bx
-		call getValue	 			; value in dx
-		
 		add bx, [bx]
-		mov al, [bx+2]				; type
+		mov al, [bx+2]					; var type
 		cmp al, INTEGER
 		je printIntVar
+		add sp, 2					; delete last push
 		
 		; print value - str
-		int 21h
-		xchg dl, dh
-		int 21h
+		add bx, 3					; get to var value
+		mov cx, 2					; count length
+		mov ah, 2					; print mode
+		printStrLoop:
+			mov dx, [bx]
+			cmp dx, 0				; array is initalized by 0. if reached to 0 mean str ended
+			je finishHandleShoutKeyword
+			int 21h
+			mov dl, dh
+			int 21h
+			
+			cmp cx, VARIABLE_MEM_SIZE
+			jae finishHandleShoutKeyword
+			
+			add cx, 2
+			add bx, 2				; get next 2 chars
+			jmp printStrLoop			; continue printing
+		
 		jmp finishHandleShoutKeyword
 		
 		printIntVar:
+			; get var value
+			call getValue	 			; value in dx
+			
 			mov ax, dx
-			call printInAsciiFormat		; print var in decimal format
+			call printInAsciiFormat			; print var in decimal format
 
 	
 	jmp finishHandleShoutKeyword
@@ -716,7 +733,7 @@ proc handleShoutKeyword
 		newLine 1
 	
 	finishHandleShoutKeyword:
-		newLine	1				; go a line down in console
+		newLine	1					; go a line down in console
 		pop cx
 		pop bx
 		pop dx
@@ -740,17 +757,17 @@ proc checkExistsVar
 	push cx
 	push di
 			
-	mov ax, PARAM1 				; var name length
+	mov ax, PARAM1 					; var name length
 	
-	mov cx, PARAM2				; var location in buffer
+	mov cx, PARAM2					; var location in buffer
 	xor dh, dh
 	
-	xor si, si	   			; memory index
+	xor si, si	   				; memory index
 	lea bx, [memoryVariables]
 
 	; finish if memory is empty
 	cmp si, [memoryInd]
-	je finishCheckExistsVar  		; memoryInd == 0
+	je finishCheckExistsVar  			; memoryInd == 0
 	
 	; keep checking while si < memoryInd
 	loopMemory:
@@ -873,21 +890,34 @@ proc insertVarToMemory
 			mov  [memoryVariables + di], ax
 			jmp finishInserting
 			
-		insert1ValStr:																							; TODO: handle large strings
-			; get 2 digits value from buffer and check whether it's only 1 digit
-			mov al, [buffer + si + 4]
-			mov ah, [buffer + si + 5]
-			cmp ah, '"'
-			jne insert2ValStr
-			xor ah, ah								; zero the "
+		insert1ValStr:
+			; insert type
+			mov  [byte ptr memoryVariables + di - 1], STRING
+			lea bx, [buffer]
+			add bx, si
+			add bx, 4
 			
-			insert2ValStr:
-				; insert type
-				mov  [byte ptr memoryVariables + di - 1], STRING
+			mov cx, 1										; mesuare length
+			; get 2 digits value from buffer and check whether it's only 1 digit
+			insertStrLoop:
+				mov al, [bx]									; get char from buffer
+				cmp al, '"'
+				je finishInserting
+				mov [byte ptr memoryVariables + di], al						; insert char to memory
 				
-				; insert value
-				mov  [memoryVariables + di], ax
-	
+				cmp cx, VARIABLE_MEM_SIZE							; check str isn't too long
+				je lengthError
+				
+				inc di
+				inc bx
+				inc cx				
+				jmp insertStrLoop
+
+	jmp finishInserting
+	lengthError:
+		printMsg ErrorStringTooLong
+		newLine 1
+		
 	finishInserting:
 		add [memoryInd], si								;  length of name
 		add [memoryInd], 3								;  2 length, 1type
@@ -1494,7 +1524,7 @@ start:
 
 	call getFilename	
 	
-	; open codefile(.txt)
+	; open codefile(with .txt extension)
 	call OpenFile
 	
 	printMsg StartedInterpreting
