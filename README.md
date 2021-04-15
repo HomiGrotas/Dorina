@@ -52,7 +52,7 @@ myAge = 16
 ### Strings
 ```
 hello = "hi"
-me = "I"
+intro = "Welcome to Dorina!"
 ```
 
 
@@ -121,6 +121,6 @@ endif
 ## Limits
 * Int on initialization - 2 digits (max 99) 
 * Int after math operations - max 65535 (word size)
-* String - max length of 2 digits
+* String - max length of 20 digits
 
-coming soon: while loop
+coming soon: while/for loop
