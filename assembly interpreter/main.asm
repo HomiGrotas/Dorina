@@ -657,9 +657,9 @@ proc handleShoutKeyword
 	push bx
 	push cx
 	
-	mov cx, PARAM1						; buffer length
-	mov si, 6						; 5 shout length, 1 stand on command content
-	mov ah, 2						; write to screen
+	mov cx, PARAM1				; buffer length
+	mov si, 6				; 5 shout length, 1 stand on command content
+	mov ah, 2				; write to screen
 	
 	; check if need to print a STRING or a variable
 	mov dl, [buffer + si]
@@ -667,13 +667,13 @@ proc handleShoutKeyword
 	jne printVar
 	
 	; printStr:
-		inc si						; 1 "
+		inc si				; 1 "
 		shoutPrintLoop:
 			mov dl, [buffer + si]
 			cmp dl, '"'
 			je finishHandleShoutKeyword
 			
-			int 21h	 				; print char
+			int 21h	 		; print char
 			
 			inc si
 			jmp shoutPrintLoop
@@ -682,18 +682,18 @@ proc handleShoutKeyword
 	printVar:
 		; check whether var exists and get its index
 		lea bx, [buffer]
-		add bx, si					; index of var name in buffer
-		sub cx, 7					; 5 shout, 1 space, 1 CR
+		add bx, si				; index of var name in buffer
+		sub cx, 7				; 5 shout, 1 space, 1 CR
 		
-		push bx						; offset of current var
-		push cx						; var name length
-		call checkExistsVar				; bx now holds the var memory index
+		push bx					; offset of current var
+		push cx					; var name length
+		call checkExistsVar			; bx now holds the var memory index
 		cmp dh, TRUE
 		jne varDoesntExists
 		
 		push bx
 		add bx, [bx]
-		mov al, [bx+2]					; var type
+		mov al, [bx+2]				; type
 		cmp al, INTEGER
 		je printIntVar
 		add sp, 2					; delete last push
@@ -704,7 +704,7 @@ proc handleShoutKeyword
 		mov ah, 2					; print mode
 		printStrLoop:
 			mov dx, [bx]
-			cmp dx, 0				; array is initalized by 0. if reached to 0 mean str ended
+			cmp dx, 0							; array is initalized by 0. if reached to 0 mean str ended
 			je finishHandleShoutKeyword
 			int 21h
 			mov dl, dh
@@ -714,8 +714,8 @@ proc handleShoutKeyword
 			jae finishHandleShoutKeyword
 			
 			add cx, 2
-			add bx, 2				; get next 2 chars
-			jmp printStrLoop			; continue printing
+			add bx, 2							; get next 2 chars
+			jmp printStrLoop					; continue printing
 		
 		jmp finishHandleShoutKeyword
 		
@@ -724,7 +724,7 @@ proc handleShoutKeyword
 			call getValue	 			; value in dx
 			
 			mov ax, dx
-			call printInAsciiFormat			; print var in decimal format
+			call printInAsciiFormat		; print var in decimal format
 
 	
 	jmp finishHandleShoutKeyword
@@ -733,7 +733,7 @@ proc handleShoutKeyword
 		newLine 1
 	
 	finishHandleShoutKeyword:
-		newLine	1					; go a line down in console
+		newLine	1				; go a line down in console
 		pop cx
 		pop bx
 		pop dx
@@ -757,17 +757,17 @@ proc checkExistsVar
 	push cx
 	push di
 			
-	mov ax, PARAM1 					; var name length
+	mov ax, PARAM1 				; var name length
 	
-	mov cx, PARAM2					; var location in buffer
+	mov cx, PARAM2				; var location in buffer
 	xor dh, dh
 	
-	xor si, si	   				; memory index
+	xor si, si	   			; memory index
 	lea bx, [memoryVariables]
 
 	; finish if memory is empty
 	cmp si, [memoryInd]
-	je finishCheckExistsVar  			; memoryInd == 0
+	je finishCheckExistsVar  		; memoryInd == 0
 	
 	; keep checking while si < memoryInd
 	loopMemory:
@@ -900,12 +900,12 @@ proc insertVarToMemory
 			mov cx, 1										; mesuare length
 			; get 2 digits value from buffer and check whether it's only 1 digit
 			insertStrLoop:
-				mov al, [bx]									; get char from buffer
+				mov al, [bx]								; get char from buffer
 				cmp al, '"'
 				je finishInserting
-				mov [byte ptr memoryVariables + di], al						; insert char to memory
+				mov [byte ptr memoryVariables + di], al		; insert char to memory
 				
-				cmp cx, VARIABLE_MEM_SIZE							; check str isn't too long
+				cmp cx, VARIABLE_MEM_SIZE					; check str isn't too long
 				je lengthError
 				
 				inc di
@@ -1020,7 +1020,8 @@ proc assignemtFromBuffer
 		jne lengthAfterStrCheck	; jump if value isn't in str format
 		
 		; STRING value
-		sub cx, 2					; sub 2 digits value
+		call getStrLengthBuffer
+		sub cx, dx					; sub x digits value						$ ToDo: sub str length on buffer
 			
 		; check 1 digit str
 		push 0						; start index
@@ -1028,7 +1029,6 @@ proc assignemtFromBuffer
 		call getValFromBuffer
 		cmp ah, '"'
 		jne lengthAfterStrCheck
-		inc cx						; var name length += 1
 	
 	lengthAfterStrCheck:
 	
@@ -1056,36 +1056,16 @@ proc assignemtFromBuffer
 		
 		; get var value
 		push 0
-		push 1  ; operator length
+		push 1  							; operator length
 		call getValFromBuffer				; ax <- new value
-		
-		; if it's int type -> get decimal from ascii
-		cmp ah, 0					; check if there is only one digit
-		jne TwoDigitsValInt
-		xchg ah, al
-		mov al, 30h
-		
-		TwoDigitsValInt:
-			sub ah, 30h				; get decimal value
-			sub al, 30h
-			mov dx, ax
-			xor ax, ax
-			mov al, dl
-			mov dl, 10
-			mul dl
-			xor dl, dl
-			xchg dh, dl
-			add ax, dx
-			jmp updateVar		
+		call bufferNumToHexVal				; hex value <- buffer num
+		jmp updateVar		
 		
 		; get var value
 		updateStr:
-			push 0					; start index in buffer
-			push 2 					; operator length + "
-			call getValFromBuffer			; ax <- new value
-			cmp ah, '"'				; if the str is 1 digit -> delete msb
-			jne updateVar
-			xor ah, ah
+			mov bx, LOCAL_VAR1			; var index
+			call updateStrVar
+			jmp finishAssignemtFromBuffer
 			
 		updateVar:
 			mov bx, LOCAL_VAR1			; var index
@@ -1105,6 +1085,68 @@ proc assignemtFromBuffer
 		ret 2
 endp assignemtFromBuffer
 
+; params: 
+;		bx: var index in memory
+proc updateStrVar
+	push bp
+	mov bp, sp
+	
+	add bx, [bx]				; skip var name length
+	add bx, 2
+	xor si, si					; buffer index
+	mov cx, 1					; count value length
+	dec si
+	reachStrLoop:
+		inc si
+		mov al, [buffer + si]
+		cmp al, '"'
+		jne reachStrLoop
+	
+	updateStrLoop:
+		inc si
+		inc bx
+		inc cx
+		mov dh, [buffer + si]
+		cmp dh, '"'
+		je deleteRestLoop
+		mov [bx], dh
+		jmp updateStrLoop
+	
+	deleteRestLoop:
+		mov [bx], 0
+		inc bx
+		loop deleteRestLoop
+		
+	finishUpdateStrVar:
+		pop bp
+		ret
+endp updateStrVar
+
+; return: dx - str length
+proc getStrLengthBuffer
+	xor dx, dx			; counter
+	xor si, si			; buffer index
+	lea bx, [buffer]
+	
+	dec dx
+	dec si
+	
+	loopStrStart:
+		inc si
+		
+		mov ah, [byte ptr bx + si]
+		cmp ah, '"'
+		jne loopStrStart
+	
+	strLengthLoop:
+		inc si
+		inc dx
+		
+		mov ah, [byte ptr bx + si]
+		cmp ah, '"'
+		jne strLengthLoop
+	ret
+endp getStrLengthBuffer
 
 
 ;----------------------------------
