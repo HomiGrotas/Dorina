@@ -715,7 +715,7 @@ proc handleShoutKeyword
 			
 			add cx, 2
 			add bx, 2							; get next 2 chars
-			jmp printStrLoop					; continue printing
+			jmp printStrLoop						; continue printing
 		
 		jmp finishHandleShoutKeyword
 		
@@ -724,7 +724,7 @@ proc handleShoutKeyword
 			call getValue	 			; value in dx
 			
 			mov ax, dx
-			call printInAsciiFormat		; print var in decimal format
+			call printInAsciiFormat			; print var in decimal format
 
 	
 	jmp finishHandleShoutKeyword
@@ -733,7 +733,7 @@ proc handleShoutKeyword
 		newLine 1
 	
 	finishHandleShoutKeyword:
-		newLine	1				; go a line down in console
+		newLine	1					; go a line down in console
 		pop cx
 		pop bx
 		pop dx
@@ -1091,7 +1091,7 @@ proc updateStrVar
 	push bp
 	mov bp, sp
 	
-	add bx, [bx]				; skip var name length
+	add bx, [bx]					; skip var name length
 	add bx, 2
 	xor si, si					; buffer index
 	mov cx, 1					; count value length
