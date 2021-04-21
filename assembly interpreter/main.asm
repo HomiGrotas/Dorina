@@ -9,12 +9,12 @@ DATASEG
 ; ---------------------------------------------- constants ----------------------------------------------
 FALSE  				equ 0
 TRUE   				equ 1
-DEBUG  				equ FALSE			; 	DEBUG mode (prints code lines while interpreting and prints program memory at the end)
+DEBUG  				equ FALSE			  ; 	DEBUG mode (prints code lines while interpreting and prints program memory at the end)
 
-FILENAME_MAX_LENGTH 		equ 26 				;	(max length is 25, 1 for $)
-MEMORY_SIZE			equ 500				; 	interpreter variables memory
-LINE_LENGTH 			equ 100				; 	max line length (used in the buffer)
-VARIABLE_MEM_SIZE		equ 20				; 	bytes size of var in memory (int is 2 bytes & str is dependant of this constant)
+FILENAME_MAX_LENGTH 		equ 26 				  ;	(max length is 25, 1 for $)
+MEMORY_SIZE			equ 500				  ; 	interpreter variables memory
+LINE_LENGTH 			equ 100				  ; 	max line length (used in the buffer)
+VARIABLE_MEM_SIZE		equ 20				  ; 	bytes size of var in memory (int is 2 bytes & str is dependant of this constant)
 
 ; ---------- procedures parameters -------------
 PARAM1 	   		  	equ [bp + 4]
@@ -107,19 +107,19 @@ jumps		; support far jumps
 ;   macro to go down a line in console
 ;-------------------------------------------
 macro newLine times
-	local newLineLoop		; adding local label (prevent error due to several calls to this macro)
+	local newLineLoop				; adding local label (prevent error due to several calls to this macro)
 	push cx
-	mov cx, times			; times to go a line down
+	mov cx, times					; times to go a line down
 	
 	newLineLoop:
 		; new line
-		mov dl, 10		; ascii ---> 10 New Line
+		mov dl, 10				; ascii ---> 10 New Line
 		mov ah, 02h
 		int 21h
-		mov dl, 13		; ascii ---> 13 Carriage Return
+		mov dl, 13				; ascii ---> 13 Carriage Return
 		mov ah, 02h
 		int 21h
-		loop newLineLoop	; keep looping ^
+		loop newLineLoop			; keep looping ^
 	pop cx
 endm
 
@@ -130,7 +130,7 @@ endm
 macro printMsg msg_to_print
     mov dx, offset &msg_to_print
 	mov ah, 9h
-	int 21h				; ah=9h, int 21h
+	int 21h						; ah=9h, int 21h
 endm
 
 
@@ -153,19 +153,19 @@ proc printArray
 	push dx
 	
 	
-	mov bx, PARAM1				; array offset 
-	mov cx, PARAM2  			; array length
+	mov bx, PARAM1						; array offset 
+	mov cx, PARAM2  					; array length
 	xor si, si
 	
 	newLine 1
-	mov ah, 2  				; write mode	
+	mov ah, 2  						; write mode	
 	
 	; print array
 	printLoop:
-		mov dl, [bx + si]		; load next byte in array
-		int 21h				; print
+		mov dl, [bx + si]				; load next byte in array
+		int 21h						; print
 		inc si
-		loop printLoop			; keep looping ^
+		loop printLoop					; keep looping ^
 	
 	pop dx
 	pop ax
