@@ -51,16 +51,20 @@ char 			db ?				  ; char from file
 shoutKeyword 		db 'shout'
 ifKeyword 		db 'if'
 endIfKeyword		db 'endif'
-forKeyword		db 'for'
-endForKeyword		db 'endFor'
+whileKeyword	db 'while'
+endwhileKeyword db 'endwhile'
 inIf 			db FALSE			  ; whether the interpreter is in an if statement 
 execIf 			db FALSE			  ; whether the if statement is true (and therefore the code should be executed)
-inFor			db FALSE
+inWhile			db FALSE
+execWhile		db FALSE
+whileStartCX	dw ?
+whileStartDX	dw ?
 
 ; ---------- messages ----------
 
 ; error messages
 ErrorMsgCouldntFindOp 	db 'Error: couldnt find an operator or a keyword...', '$'
+ErrorMsgCouldntFindBoolOp 	db 'Error: couldnt find boolean operator...', '$'
 ErrorMsgOpen 		db 'Error: error while opening code file','$'
 ErrorVarDoesntExists 	db "Error: var doesn't exists", '$'
 ErrorDivideByZero 	db "Error: can't divide by zero", '$'
@@ -310,7 +314,23 @@ endp OpenFile
 proc readLineByLine
 	xor si, si					  	; buffer length
     read_line:
-            mov ah, 3Fh      					;read file
+			cmp si, 0
+			jne continueReading
+			cmp [inWhile], FALSE
+			jne continueReading
+			
+			; save while start location
+			mov ah, 42h		          	;function
+			mov al, 1           		;to calculate offset from current poisition
+			mov dx, offset filehandle     		;from opening the file
+			mov cx, 0     			 	;most significant part of offset
+			mov dx, 0        			;least significant part of offset
+			int 21h             		;system call
+			mov [whileStartCX], dx
+			mov [whileStartDX], ax
+			
+			continueReading:
+			mov ah, 3Fh      					;read file
             mov bx, [filehandle]
             lea dx, [char]					; location to store char
             mov cx, 1						; read 1 char
@@ -397,11 +417,39 @@ proc handleOneLineCommand
 		cmp dh, TRUE
 		je endIfLbl
 		
+		
+		; check whether 'endwhile' keyword is used
+		push offset endwhileKeyword
+		push offset buffer
+		push 8
+		call cmpStrings
+		
+		; if endif keyword is used -> jmp to it's label
+		cmp dh, TRUE
+		je endWhileLbl
+		
+		; check whether while keyword is used
+		push offset whileKeyword
+		push offset buffer
+		push 5
+		call cmpStrings
+		
+		cmp dh, TRUE
+		je startWhile
+		
 		; if in if statement and it's FALSE -> don't execute
 		cmp [inIf], FALSE
-		je checkOp
+		je checkInWhile
 		cmp [execIf], FALSE
 		je finishHandleOneLineCommand
+		
+		checkInWhile:
+		; if in while statement and it's FALSE -> don't execute
+		cmp [inWhile], FALSE
+		je checkOp
+		cmp [execWhile], FALSE
+		je finishHandleOneLineCommand 
+		
 		
 		; search for operator / keyword
 		checkOp:
@@ -504,17 +552,63 @@ proc handleOneLineCommand
 		call mathOperators				
 		jmp finishHandleOneLineCommand
 	
+	startWhile:
+		mov [inWhile], TRUE				; we are in if statement now (TRUE)
+		lea bx, [buffer]
+		add bx, 6					; 5 while, 1 space (offset)
+		sub cx, 6					; 5 while, 1 space (array lengthי
+		mov di, 2					; operator size (2/1)	
+
+		push bx						; array offset
+		push cx						; array length
+		call findOp					; dx <- operator
+		
+		cmp dh, 0					; handle 1 digit operator
+		jne checkValLengthWhile
+		dec di
+		inc cx
+		
+		checkValLengthWhile:
+			; check var length (buffer length - 1/2 value length - 2 space, 1/2 operator)
+			push 6					; start index (while length +1)
+			push di					; operator size
+			call getValFromBuffer
+			cmp ax, 3031
+			jb handleOperator
+			
+			dec cx ; 1 val
+			jmp handleOperator
+		
 	; handle if keyword
 	startIf:
 		mov [inIf], TRUE				; we are in if statement now (TRUE)
 		lea bx, [buffer]
 		add bx, 3					; 2 if, 1 space (offset)
 		sub cx, 3					; 2 if, 1 space (array length)
-		
+		mov di, 2					; 2 if		
+
 		push bx						; array offset
 		push cx						; array length
 		call findOp					; dx <- operator
 		
+		cmp dh, 0					; handle 1 digit operator
+		jne checkValLength
+		dec di
+		inc cx
+		
+		
+		checkValLength:
+		; check var length (buffer length - 1/2 value length - 2 space, 1/2 operator)
+		push 3
+		push di
+		call getValFromBuffer
+		cmp ax, 3031
+		jb handleOperator
+		
+		dec cx ; 1 val
+		
+		
+		handleOperator:
 		;---------------------
 		; BOOLEAN operators check:
 		cmp dx, '<'
@@ -534,7 +628,7 @@ proc handleOneLineCommand
 		
 		cmp dx, '>='
 		je handleBiggerE
-		
+		jmp unknownOperator
 		
 		handleSmaller:						; < operator
 			push bx
@@ -578,12 +672,41 @@ proc handleOneLineCommand
 			call booleanOperators
 			jmp checkTRUECondition
 		
+		unknownOperator:
+			printMsg ErrorMsgCouldntFindBoolOp
+			newLine 1
+		
 		checkTRUECondition:
+			cmp [inWhile], TRUE
+			je updateExecWhile
+			
 			mov [execIf], dh				; condition TRUE/ FALSE
 			jmp finishHandleOneLineCommand
+
+			updateExecWhile:
+				mov [execWhile], dh
+				cmp dh, TRUE
+				jne  finishHandleOneLineCommand
 			
+				jmp finishHandleOneLineCommand
+				
+				
 	endIfLbl:
 		mov [inIf], FALSE
+		jmp finishHandleOneLineCommand
+		
+	endWhileLbl:
+		mov [inWhile], FALSE
+		cmp [execWhile], FALSE
+		je finishHandleOneLineCommand
+		
+		mov [inWhile], TRUE
+		mov ah, 42h		          	;function
+		mov al, 0           		;to calculate offset from beginning of file
+		mov dx, offset filehandle     		;from opening the file
+		mov cx, [whileStartCX]     			 	;most significant part of offset
+		mov dx, [whileStartDX]       			;least significant part of offset
+		int 21h             		;system call
 		jmp finishHandleOneLineCommand
 	
 	handleShout:							; shout keyword
@@ -715,7 +838,7 @@ proc handleShoutKeyword
 			
 			add cx, 2
 			add bx, 2							; get next 2 chars
-			jmp printStrLoop						; continue printing
+			jmp printStrLoop					; continue printing
 		
 		jmp finishHandleShoutKeyword
 		
@@ -724,7 +847,7 @@ proc handleShoutKeyword
 			call getValue	 			; value in dx
 			
 			mov ax, dx
-			call printInAsciiFormat			; print var in decimal format
+			call printInAsciiFormat		; print var in decimal format
 
 	
 	jmp finishHandleShoutKeyword
@@ -733,7 +856,7 @@ proc handleShoutKeyword
 		newLine 1
 	
 	finishHandleShoutKeyword:
-		newLine	1					; go a line down in console
+		newLine	1				; go a line down in console
 		pop cx
 		pop bx
 		pop dx
@@ -1091,7 +1214,7 @@ proc updateStrVar
 	push bp
 	mov bp, sp
 	
-	add bx, [bx]					; skip var name length
+	add bx, [bx]				; skip var name length
 	add bx, 2
 	xor si, si					; buffer index
 	mov cx, 1					; count value length
@@ -1113,7 +1236,7 @@ proc updateStrVar
 		jmp updateStrLoop
 	
 	deleteRestLoop:
-		mov [bx], 0
+		mov [word ptr bx], 0
 		inc bx
 		loop deleteRestLoop
 		
@@ -1395,7 +1518,7 @@ endp mathOperators
 ;----------------------------------------
 ; BOOLEAN operators
 ; <, >, ==, !=, <=, >=
-; params: offset to search in,  length, operator
+; params: offset to search in,  length, operator, while keyword? (TRUE/ FALSE)
 ; returns: dh (TRUE/ FALSE)
 ;----------------------------------------
 proc booleanOperators
@@ -1407,25 +1530,10 @@ proc booleanOperators
 	push bx
 	push cx
 	
-	mov di, 2
+	mov LOCAL_VAR1, ax				; while loop?			
+	
 	mov cx, PARAM2						; buffer length
 	dec cx							; remove CR (carriage return)
-	
-	; check if operator is only 1 digit
-	cmp [byte ptr bp+5], 0 
-	jne checkValLength
-	dec di
-	inc cx
-	
-	checkValLength:
-	; check var length (buffer length - 1/2 value length - 2 space, 1/2 operator)
-	push 3
-	push di
-	call getValFromBuffer
-	cmp ax, 3031
-	jb lengthAferValueCheckBoolOperator
-	
-	dec cx ; 1 val
 	
 	lengthAferValueCheckBoolOperator:		
 		sub cx, 5					;  2 space, 2 operator, 1 val
@@ -1445,7 +1553,14 @@ proc booleanOperators
 		mov bx, dx					; bx hold current value (dh is the return value)
 		
 		; get value from buffer
+		cmp [inWhile], FALSE
+		jne whileKeywordPushLength
 		push 3
+		jmp getValFromBufferWhileIf
+		whileKeywordPushLength:
+		push 6
+		
+		getValFromBufferWhileIf:
 		push di
 		call getValFromBuffer				; ax holds value from buffer
 		
@@ -1505,7 +1620,7 @@ proc booleanOperators
 	TRUECondition:
 		mov dh, TRUE
 
-	finishBooleanOperators:
+	finishBooleanOperators:		
 		pop cx
 		pop bx
 		pop ax
