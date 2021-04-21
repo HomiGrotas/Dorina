@@ -1,0 +1,10 @@
+x = 5
+x += 2
+shout "5+2 is:"
+shout x
+x *= 10
+shout "7*10 is:"
+shout x
+shout "70/ 5 is:"
+x /= 5
+shout x

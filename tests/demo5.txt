@@ -1,0 +1,6 @@
+counter = 0
+while counter < 10
+shout "counting"
+shout counter
+counter += 1
+endwhile

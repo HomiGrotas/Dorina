@@ -1,0 +1,7 @@
+my_name = "Nadav Shani"
+my_age = 16
+shout "Hi! Welcome to the Dorina project!"
+shout "my name is"
+shout my_name
+shout "and my age is"
+shout my_age

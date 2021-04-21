@@ -1,0 +1,12 @@
+child1_age = 10
+child2_age = 18
+child1_name = "Ron"
+child2_name = "Orel"
+shout "let's see who is older enough to enter the bar"
+shout "The kids that are allowed to enter the bar are:"
+if child1_age >= 18
+shout child1_name
+endif
+if child2_age >= 18
+shout child2_name
+endif
