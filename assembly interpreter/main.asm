@@ -32,7 +32,7 @@ STRING 			  	equ 1
 
 ; ---------------------------------------------- variables ----------------------------------------------
 memoryVariables 		dw MEMORY_SIZE dup(0)             ; array - stores program variables
-memoryInd 			dw 0				  ; can be up to 65,535 bits
+memoryInd 			dw 0				  ; can be up to 65,535 bytes
 
 ; variables for file opening
 filename 			db FILENAME_MAX_LENGTH   	  ; file to operate on
