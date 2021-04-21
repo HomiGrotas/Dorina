@@ -119,6 +119,7 @@ endif
 
 
 ## While statement
+Uses same operators as the if statement
 ```
 counter = 0
 while counter < 10
