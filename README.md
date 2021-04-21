@@ -122,5 +122,3 @@ endif
 * Int on initialization - 2 digits (max 99) 
 * Int after math operations - max 65535 (word size)
 * String - max length of 20 digits
-
-coming soon: while/for loop
