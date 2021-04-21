@@ -269,7 +269,7 @@ proc getFilename
 	
 	mov si, offset filename + 1 				; 1- skip number of  chars entered.
 	mov cl, [si]						; move length to cl.
-	mov ch, 0      						; clear ch to use cx. 
+	xor ch, ch     						; clear ch to use cx. 
 	inc cx 							; to reach last char.
 	add si, cx 						; now si points to last char.
 	mov [byte ptr si], 0 					; replace last chat (ENTER) BY '$'.	
