@@ -51,7 +51,7 @@ shoutKeyword 			db 'shout'
 ifKeyword 			db 'if'
 endIfKeyword			db 'endif'
 whileKeyword			db 'while'
-endwhileKeyword db 'endwhile'
+endwhileKeyword			db 'endwhile'
 inIf 				db FALSE			  ; whether the interpreter is in an if statement 
 execIf 				db FALSE			  ; whether the if statement is true (and therefore the code should be executed)
 inWhile				db FALSE			  ; whether the interpreter is in an while statement
