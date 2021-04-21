@@ -36,67 +36,67 @@ STRING 			  	equ 1
 BOOLEAN 		  	equ 2
 
 ; ---------------------------------------------- variables ----------------------------------------------
-memoryVariables 	dw MEMORY_SIZE dup(0)           ; buffer array - stores the data from the file
-memoryInd 		dw 0				  ; can be up to 65,535 bits
+memoryVariables 		dw MEMORY_SIZE dup(0)             ; buffer array - stores the data from the file
+memoryInd 			dw 0				  ; can be up to 65,535 bits
 
 ; variables for file opening
-filename 		db FILENAME_MAX_LENGTH   	  ; file to operate on
-filehandle  		dw '.'				  ; file handle
+filename 			db FILENAME_MAX_LENGTH   	  ; file to operate on
+filehandle  			dw '.'				  ; file handle
 
 ; variables for reading the file
-buffer 			db LINE_LENGTH dup('#')		  ; buffer (line)
-char 			db ?				  ; char from file 
+buffer 				db LINE_LENGTH dup('#')		  ; buffer (line)
+char 				db ?				  ; char from file 
 
 ; keywords
-shoutKeyword 		db 'shout'
-ifKeyword 		db 'if'
-endIfKeyword		db 'endif'
-whileKeyword	db 'while'
+shoutKeyword 			db 'shout'
+ifKeyword 			db 'if'
+endIfKeyword			db 'endif'
+whileKeyword			db 'while'
 endwhileKeyword db 'endwhile'
-inIf 			db FALSE			  ; whether the interpreter is in an if statement 
-execIf 			db FALSE			  ; whether the if statement is true (and therefore the code should be executed)
-inWhile			db FALSE
-execWhile		db FALSE
-whileStartCX	dw ?
-whileStartDX	dw ?
+inIf 				db FALSE			  ; whether the interpreter is in an if statement 
+execIf 				db FALSE			  ; whether the if statement is true (and therefore the code should be executed)
+inWhile				db FALSE			  ; whether the interpreter is in an while statement
+execWhile			db FALSE			  ; whether the while statement is true (and therefore the code should be executed)
+whileStartCX			dw ?			          ; points to the begining of the while loop (cx:dx)
+whileStartDX			dw ?				  ; points to the begining of the while loop (cx:dx)
 
 ; ---------- messages ----------
 
 ; error messages
-ErrorMsgCouldntFindOp 	db 'Error: couldnt find an operator or a keyword...', '$'
+ErrorMsgCouldntFindOp 		db 'Error: couldnt find an operator or a keyword...', '$'
 ErrorMsgCouldntFindBoolOp 	db 'Error: couldnt find boolean operator...', '$'
-ErrorMsgOpen 		db 'Error: error while opening code file','$'
-ErrorVarDoesntExists 	db "Error: var doesn't exists", '$'
-ErrorDivideByZero 	db "Error: can't divide by zero", '$'
-ErrorStringTooLong 	db "Warning: the string entered is to long. Entered max length possible.",'$'
+ErrorMsgOpen 			db 'Error: error while opening code file','$'
+ErrorVarDoesntExists 		db "Error: var doesn't exists", '$'
+ErrorDivideByZero 		db "Error: can't divide by zero", '$'
+ErrorStringTooLong 		db "Warning: the string entered is to long. Entered max length possible.",'$'
 
 ; other messages (informative)
-EnterFileNameMsg 	db "Please enter a valid file name:", '$'
-StartedInterpreting 	db 'Started interpreting...', 13, 10, 13, 10, 13, 10
-			db '_______Output_______', '$'
+EnterFileNameMsg 		db "Please enter a valid file name:", '$'
+StartedInterpreting 		db 'Started interpreting...', 13, 10, 13, 10, 13, 10
+				db '_______Output_______', '$'
 					
-MemoryPrintMsg 		db '----------------------  MEMORY ----------------------', '$'
-FinishMsg 		db 'Finished Succesfuly!', '$' 																			; finished the program
-DorinaOpenMsg   	db "  _____             _               									", 13                                            
-					db " |  __ \           (_)                                                         		", 13
-					db " | |  | | ___  _ __ _ _ __   __ _                                              		", 13 
-					db " | |  | |/ _ \| '__| | '_ \ / _` |                                             		", 13 
-					db " | |__| | (_) | |  | | | | | (_| |                                             		", 13
-					db " |_____/ \___/|_|  |_|_| |_|\__,_|                                          		", 13
-					db "                                                                                    	", 13
-					db "  ____            _   _           _                  _____ _                 _      	", 13
-					db " |  _ \       _  | \ | |         | |                / ____| |               (_)		", 13
-					db " | |_) |_   _(_) |  \| | __ _  __| | __ ___   __   | (___ | |__   __ _ _ __  _ 		", 13
-					db " |  _ <| | | |   | . ` |/ _` |/ _` |/ _` \ \ / /    \___ \| '_ \ / _` | '_ \| |		", 13 
-					db " | |_) | |_| |_  | |\  | (_| | (_| | (_| |\ V /     ____) | | | | (_| | | | | |		", 13
-					db " |____/ \__, (_) |_| \_|\__,_|\__,_|\__,_| \_/     |_____/|_| |_|\__,_|_| |_|_|		", 13
-					db "         __/ |                                                                 		", 13 
-					db " __     |___/              ___   ___ ___  __                                   		", 13 
-					db " \ \   / /             _  |__ \ / _ \__ \/_ |                                 		", 13 
-					db "  \ \_/ /__  __ _ _ __(_)    ) | | | | ) || |                                  		", 13 
-					db "   \   / _ \/ _` | '__|     / /| | | |/ / | |                                  		", 13 
-					db "    | |  __/ (_| | |   _   / /_| |_| / /_ | |                                  		", 13 
-					db "    |_|\___|\__,_|_|  (_) |____|\___/____||_|                                  		", 13, '$'
+MemoryPrintMsg 			db '----------------------  MEMORY ----------------------', '$'
+FinishMsg 			db 'Finished Succesfuly!', '$' 										; finished the program
+DorinaOpenMsg   		db "  _____             _               									", 13                                            
+						db " |  __ \           (_)                                                         		", 13
+						db " | |  | | ___  _ __ _ _ __   __ _                                              		", 13 
+						db " | |  | |/ _ \| '__| | '_ \ / _` |                                             		", 13 
+						db " | |__| | (_) | |  | | | | | (_| |                                             		", 13
+						db " |_____/ \___/|_|  |_|_| |_|\__,_|                                          		", 13
+						db "                                                                                    	", 13
+						db "  ____            _   _           _                  _____ _                 _      	", 13
+						db " |  _ \       _  | \ | |         | |                / ____| |               (_)		", 13
+						db " | |_) |_   _(_) |  \| | __ _  __| | __ ___   __   | (___ | |__   __ _ _ __  _ 		", 13
+						db " |  _ <| | | |   | . ` |/ _` |/ _` |/ _` \ \ / /    \___ \| '_ \ / _` | '_ \| |		", 13 
+						db " | |_) | |_| |_  | |\  | (_| | (_| | (_| |\ V /     ____) | | | | (_| | | | | |		", 13
+						db " |____/ \__, (_) |_| \_|\__,_|\__,_|\__,_| \_/     |_____/|_| |_|\__,_|_| |_|_|		", 13
+						db "         __/ |                                                                 		", 13 
+						db " __     |___/              ___   ___ ___  __                                   		", 13 
+						db " \ \   / /             _  |__ \ / _ \__ \/_ |                                 		", 13 
+						db "  \ \_/ /__  __ _ _ __(_)    ) | | | | ) || |                                  		", 13 
+						db "   \   / _ \/ _` | '__|     / /| | | |/ / | |                                  		", 13 
+						db "    | |  __/ (_| | |   _   / /_| |_| / /_ | |                                  		", 13 
+						db "    |_|\___|\__,_|_|  (_) |____|\___/____||_|                                  		", 13, '$'
 				
 
 CODESEG
@@ -321,16 +321,16 @@ proc readLineByLine
 			
 			; save while start location
 			mov ah, 42h		          	;function
-			mov al, 1           		;to calculate offset from current poisition
+			mov al, 1           			;to calculate offset from current poisition
 			mov dx, offset filehandle     		;from opening the file
 			mov cx, 0     			 	;most significant part of offset
 			mov dx, 0        			;least significant part of offset
-			int 21h             		;system call
+			int 21h             			;system call
 			mov [whileStartCX], dx
 			mov [whileStartDX], ax
 			
 			continueReading:
-			mov ah, 3Fh      					;read file
+			mov ah, 3Fh      			;read file
             mov bx, [filehandle]
             lea dx, [char]					; location to store char
             mov cx, 1						; read 1 char
@@ -701,12 +701,12 @@ proc handleOneLineCommand
 		je finishHandleOneLineCommand
 		
 		mov [inWhile], TRUE
-		mov ah, 42h		          	;function
-		mov al, 0           		;to calculate offset from beginning of file
-		mov dx, offset filehandle     		;from opening the file
-		mov cx, [whileStartCX]     			 	;most significant part of offset
-		mov dx, [whileStartDX]       			;least significant part of offset
-		int 21h             		;system call
+		mov ah, 42h		          			; function
+		mov al, 0           					; to calculate offset from beginning of file
+		mov dx, offset filehandle     				; from opening the file
+		mov cx, [whileStartCX]     				; most significant part of offset
+		mov dx, [whileStartDX]       				; least significant part of offset
+		int 21h             					; system call
 		jmp finishHandleOneLineCommand
 	
 	handleShout:							; shout keyword
@@ -780,9 +780,9 @@ proc handleShoutKeyword
 	push bx
 	push cx
 	
-	mov cx, PARAM1				; buffer length
-	mov si, 6				; 5 shout length, 1 stand on command content
-	mov ah, 2				; write to screen
+	mov cx, PARAM1						; buffer length
+	mov si, 6						; 5 shout length, 1 stand on command content
+	mov ah, 2						; write to screen
 	
 	; check if need to print a STRING or a variable
 	mov dl, [buffer + si]
@@ -790,13 +790,13 @@ proc handleShoutKeyword
 	jne printVar
 	
 	; printStr:
-		inc si				; 1 "
+		inc si						; 1 "
 		shoutPrintLoop:
 			mov dl, [buffer + si]
 			cmp dl, '"'
 			je finishHandleShoutKeyword
 			
-			int 21h	 		; print char
+			int 21h	 				; print char
 			
 			inc si
 			jmp shoutPrintLoop
@@ -805,18 +805,18 @@ proc handleShoutKeyword
 	printVar:
 		; check whether var exists and get its index
 		lea bx, [buffer]
-		add bx, si				; index of var name in buffer
-		sub cx, 7				; 5 shout, 1 space, 1 CR
+		add bx, si					; index of var name in buffer
+		sub cx, 7					; 5 shout, 1 space, 1 CR
 		
-		push bx					; offset of current var
-		push cx					; var name length
-		call checkExistsVar			; bx now holds the var memory index
+		push bx						; offset of current var
+		push cx						; var name length
+		call checkExistsVar				; bx now holds the var memory index
 		cmp dh, TRUE
 		jne varDoesntExists
 		
 		push bx
 		add bx, [bx]
-		mov al, [bx+2]				; type
+		mov al, [bx+2]					; type
 		cmp al, INTEGER
 		je printIntVar
 		add sp, 2					; delete last push
@@ -827,7 +827,7 @@ proc handleShoutKeyword
 		mov ah, 2					; print mode
 		printStrLoop:
 			mov dx, [bx]
-			cmp dx, 0							; array is initalized by 0. if reached to 0 mean str ended
+			cmp dx, 0				; array is initalized by 0. if reached to 0 mean str ended
 			je finishHandleShoutKeyword
 			int 21h
 			mov dl, dh
@@ -837,8 +837,8 @@ proc handleShoutKeyword
 			jae finishHandleShoutKeyword
 			
 			add cx, 2
-			add bx, 2							; get next 2 chars
-			jmp printStrLoop					; continue printing
+			add bx, 2				; get next 2 chars
+			jmp printStrLoop			; continue printing
 		
 		jmp finishHandleShoutKeyword
 		
@@ -847,7 +847,7 @@ proc handleShoutKeyword
 			call getValue	 			; value in dx
 			
 			mov ax, dx
-			call printInAsciiFormat		; print var in decimal format
+			call printInAsciiFormat			; print var in decimal format
 
 	
 	jmp finishHandleShoutKeyword
@@ -856,7 +856,7 @@ proc handleShoutKeyword
 		newLine 1
 	
 	finishHandleShoutKeyword:
-		newLine	1				; go a line down in console
+		newLine	1					; go a line down in console
 		pop cx
 		pop bx
 		pop dx
@@ -1020,13 +1020,13 @@ proc insertVarToMemory
 			add bx, si
 			add bx, 4
 			
-			mov cx, 1										; mesuare length
+			mov cx, 1								; mesuare length
 			; get 2 digits value from buffer and check whether it's only 1 digit
 			insertStrLoop:
-				mov al, [bx]								; get char from buffer
+				mov al, [bx]							; get char from buffer
 				cmp al, '"'
 				je finishInserting
-				mov [byte ptr memoryVariables + di], al		; insert char to memory
+				mov [byte ptr memoryVariables + di], al				; insert char to memory
 				
 				cmp cx, VARIABLE_MEM_SIZE					; check str isn't too long
 				je lengthError
@@ -1144,7 +1144,7 @@ proc assignemtFromBuffer
 		
 		; STRING value
 		call getStrLengthBuffer
-		sub cx, dx					; sub x digits value						$ ToDo: sub str length on buffer
+		sub cx, dx					; sub x digits value
 			
 		; check 1 digit str
 		push 0						; start index
@@ -1179,7 +1179,7 @@ proc assignemtFromBuffer
 		
 		; get var value
 		push 0
-		push 1  							; operator length
+		push 1  					; operator length
 		call getValFromBuffer				; ax <- new value
 		call bufferNumToHexVal				; hex value <- buffer num
 		jmp updateVar		
@@ -1214,7 +1214,7 @@ proc updateStrVar
 	push bp
 	mov bp, sp
 	
-	add bx, [bx]				; skip var name length
+	add bx, [bx]					; skip var name length
 	add bx, 2
 	xor si, si					; buffer index
 	mov cx, 1					; count value length
@@ -1288,8 +1288,8 @@ proc getValue
 	add bx, PARAM1
 	
 	; skip var name
-	add bx, [bx] 		; bx += var name length
-	mov dx, [bx + 3]	; skip type 1, var name length 2
+	add bx, [bx] 			; bx += var name length
+	mov dx, [bx + 3]		; skip type 1, var name length 2
 		
 	pop bx
 	pop bp
@@ -1530,7 +1530,7 @@ proc booleanOperators
 	push bx
 	push cx
 	
-	mov LOCAL_VAR1, ax				; while loop?			
+	mov LOCAL_VAR1, ax					; while loop?			
 	
 	mov cx, PARAM2						; buffer length
 	dec cx							; remove CR (carriage return)
