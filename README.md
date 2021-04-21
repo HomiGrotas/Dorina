@@ -118,6 +118,16 @@ endif
 ```
 
 
+## While statement
+```
+counter = 0
+while counter < 10
+shout "counting"
+shout counter
+counter += 1
+endwhile
+```
+
 ## Limits
 * Int on initialization - 2 digits (max 99) 
 * Int after math operations - max 65535 (word size)
