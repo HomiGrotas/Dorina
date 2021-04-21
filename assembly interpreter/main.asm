@@ -2,10 +2,6 @@ IDEAL
 MODEL small
 STACK 100h
 
-; ToDO:
-;		for loop
-;		upgarde string length
-
 ; Interpreter memory structure: [length (word), name (unlinited), type (int/str), value (word), length, name, type, value...]
 
 DATASEG
