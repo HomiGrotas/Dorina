@@ -128,7 +128,7 @@ endm
 ;   macro to print messages to screen
 ;-------------------------------------------
 macro printMsg msg_to_print
-    mov dx, offset &msg_to_print
+    	mov dx, offset &msg_to_print
 	mov ah, 9h
 	int 21h						; ah=9h, int 21h
 endm
