@@ -221,7 +221,7 @@ proc cmpStrings
 	
 	
 	mov ax, PARAM1						; if length is odd there is one more digit to compare
-	test ax, 1
+	and ax, 1
 	jz equals
 	
 	; compare digit that was left
