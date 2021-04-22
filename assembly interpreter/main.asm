@@ -730,7 +730,7 @@ proc printInAsciiFormat
 	xor cx, cx							; amount of iterations
 	
 	loop1:
-		mov dx, 0
+		xor dx, dx
 		div bx							; ax /= 10
 		add dl, 30h						; remainder, convert to ascii value
 		push dx							; insert into stack in order to change printing order
