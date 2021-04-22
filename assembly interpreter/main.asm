@@ -11,7 +11,7 @@ FALSE  				equ 0
 TRUE   				equ 1
 DEBUG  				equ FALSE			  ; 	DEBUG mode (prints code lines while interpreting and prints program memory at the end)
 
-FILENAME_MAX_LENGTH 		equ 26 				  ;	(max length is 25, 1 for $)
+FILENAME_MAX_LENGTH 		equ 26 				  ;	(max length is 24, 1 buffer length and 1 for input length)
 MEMORY_SIZE			equ 500				  ; 	interpreter variables memory
 LINE_LENGTH 			equ 100				  ; 	max line length (used in the buffer)
 VARIABLE_MEM_SIZE		equ 20				  ; 	bytes size of var in memory (int is 2 bytes & str is dependant of this constant)
