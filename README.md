@@ -133,3 +133,5 @@ endwhile
 * Int on initialization - 2 digits (max 99) 
 * Int after math operations - max 65535 (word size)
 * String - max length of 20 digits
+* Notice, there should be a blank line only at the end of the code file
+* Notice, there shouldn't be spaces at end of a line.
