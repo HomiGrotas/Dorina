@@ -14,7 +14,7 @@ This is the final project of my assembly learning.
 ## Stages:
 - [x] design the language
 - [x] build a python interpreter
-- [ ] build an assembly interpreter based on the python version
+- [x] build an assembly interpreter based on the python version
 
 
 
